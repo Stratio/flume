@@ -18,10 +18,12 @@
 
 package org.apache.flume.serialization;
 
-import java.io.OutputStream;
 import org.apache.flume.Context;
 import org.apache.flume.annotations.InterfaceAudience;
 import org.apache.flume.annotations.InterfaceStability;
+
+import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * <p/>A class that is able to both serialize and deserialize events.
@@ -43,7 +45,7 @@ public interface EventSerDe extends EventSerializer, EventDeserializer {
    * <b>Note: Implementations MUST provide a public a no-arg constructor.</b>
    */
   public interface Builder {
-    public EventSerDe build(Context context, ResettableInputStream in, OutputStream out);
+    public EventSerDe build(Context context, InputStream in, OutputStream out);
   }
 
 }
