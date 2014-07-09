@@ -18,45 +18,65 @@
 
 package org.apache.flume.serialization;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
+import org.apache.flume.FlumeException;
 import org.apache.flume.annotations.InterfaceAudience;
 import org.apache.flume.annotations.InterfaceStability;
 import org.apache.flume.event.EventBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A deserializer that parses text lines from a file.
+ * A deserializer that parses text lines from a supplied {@link Seekable} {@link InputStream}.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class LineDeserializer implements EventDeserializer {
 
-  private static final Logger logger = LoggerFactory.getLogger
-      (LineDeserializer.class);
+  /**
+   * The character stream to read lines from.
+   */
+  private final ResettableLineReader in;
 
-  private final ResettableInputStream in;
   private final Charset outputCharset;
   private final int maxLineLength;
   private volatile boolean isOpen;
 
-  public static final String OUT_CHARSET_KEY = "outputCharset";
-  public static final String CHARSET_DFLT = "UTF-8";
+  /** Character set used when reading the input. */
+  public static final String INPUT_CHARSET_KEY = "inputCharset";
+  public static final String DEFAULT_INPUT_CHARSET = "UTF-8";
+
+  /** Character set used when creating new Events. */
+  public static final String OUTPUT_CHARSET_KEY = "outputCharset";
+  public static final String DEFAULT_OUTPUT_CHARSET = "UTF-8";
+
+  /** What to do when there is a character set decoding error. */
+  public static final String DECODE_ERROR_POLICY = "decodeErrorPolicy";
+  public static final String DEFAULT_DECODE_ERROR_POLICY = DecodeErrorPolicy.FAIL.name();
 
   public static final String MAXLINE_KEY = "maxLineLength";
   public static final int MAXLINE_DFLT = 2048;
 
-  LineDeserializer(Context context, ResettableInputStream in) {
-    this.in = in;
+  LineDeserializer(Context context, InputStream in) throws IOException {
     this.outputCharset = Charset.forName(
-        context.getString(OUT_CHARSET_KEY, CHARSET_DFLT));
+        context.getString(OUTPUT_CHARSET_KEY, DEFAULT_OUTPUT_CHARSET));
+    Charset inputCharset = Charset.forName(
+        context.getString(INPUT_CHARSET_KEY, DEFAULT_INPUT_CHARSET));
+    Preconditions.checkNotNull(inputCharset);
+    DecodeErrorPolicy decodeErrorPolicy = DecodeErrorPolicy.valueOf(
+        context.getString(DECODE_ERROR_POLICY, DEFAULT_DECODE_ERROR_POLICY)
+            .toUpperCase());
+    Preconditions.checkNotNull(decodeErrorPolicy);
+    CharsetDecoder decoder = decodeErrorPolicy.newDecoder(inputCharset);
+    this.in = new ResettableLineReader(new ResettableInputStreamReader(in, decoder));
     this.maxLineLength = context.getInteger(MAXLINE_KEY, MAXLINE_DFLT);
     this.isOpen = true;
   }
@@ -69,7 +89,7 @@ public class LineDeserializer implements EventDeserializer {
   @Override
   public Event readEvent() throws IOException {
     ensureOpen();
-    String line = readLine();
+    String line = in.readLine(maxLineLength);
     if (line == null) {
       return null;
     } else {
@@ -125,41 +145,19 @@ public class LineDeserializer implements EventDeserializer {
     }
   }
 
-  // TODO: consider not returning a final character that is a high surrogate
-  // when truncating
-  private String readLine() throws IOException {
-    StringBuilder sb = new StringBuilder();
-    int c;
-    int readChars = 0;
-    while ((c = in.readChar()) != -1) {
-      readChars++;
-
-      // FIXME: support \r\n
-      if (c == '\n') {
-        break;
-      }
-
-      sb.append((char)c);
-
-      if (readChars >= maxLineLength) {
-        logger.warn("Line length exceeds max ({}), truncating line!",
-            maxLineLength);
-        break;
-      }
-    }
-
-    if (readChars > 0) {
-      return sb.toString();
-    } else {
-      return null;
-    }
-  }
-
   public static class Builder implements EventDeserializer.Builder {
 
     @Override
-    public EventDeserializer build(Context context, ResettableInputStream in) {
-      return new LineDeserializer(context, in);
+    public EventDeserializer build(Context context, InputStream in) {
+      if (!(in instanceof Seekable)) {
+        throw new IllegalArgumentException(
+            "Cannot use this deserializer without a Seekable input stream");
+      }
+      try {
+        return new LineDeserializer(context, in);
+      } catch (IOException e) {
+        throw new FlumeException("Cannot instantiate deserializer", e);
+      }
     }
 
   }

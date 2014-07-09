@@ -17,6 +17,7 @@
 package org.apache.flume.sink.solr.morphline;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 import org.apache.commons.io.output.ByteArrayOutputStream;
@@ -27,7 +28,7 @@ import org.apache.flume.annotations.InterfaceStability;
 import org.apache.flume.conf.ConfigurationException;
 import org.apache.flume.event.EventBuilder;
 import org.apache.flume.serialization.EventDeserializer;
-import org.apache.flume.serialization.ResettableInputStream;
+import org.apache.flume.serialization.Resettable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +45,7 @@ import com.google.common.collect.Lists;
 @InterfaceStability.Evolving
 public class BlobDeserializer implements EventDeserializer {
 
-  private ResettableInputStream in;
+  private InputStream in;
   private final int maxBlobLength;
   private volatile boolean isOpen;
 
@@ -53,8 +54,8 @@ public class BlobDeserializer implements EventDeserializer {
 
   private static final int DEFAULT_BUFFER_SIZE = 1024 * 8;
   private static final Logger LOGGER = LoggerFactory.getLogger(BlobDeserializer.class);
-      
-  protected BlobDeserializer(Context context, ResettableInputStream in) {
+
+  protected BlobDeserializer(Context context, InputStream in) {
     this.in = in;
     this.maxBlobLength = context.getInteger(MAX_BLOB_LENGTH_KEY, MAX_BLOB_LENGTH_DEFAULT);
     if (this.maxBlobLength <= 0) {
@@ -120,7 +121,7 @@ public class BlobDeserializer implements EventDeserializer {
   @Override
   public void mark() throws IOException {
     ensureOpen();
-    in.mark();
+    ((Resettable)in).mark();
   }
 
   @Override
@@ -152,7 +153,11 @@ public class BlobDeserializer implements EventDeserializer {
   public static class Builder implements EventDeserializer.Builder {
 
     @Override
-    public BlobDeserializer build(Context context, ResettableInputStream in) {      
+    public BlobDeserializer build(Context context, InputStream in) {
+      if (!(in instanceof Resettable)) {
+        throw new IllegalArgumentException(
+            "Cannot use this deserializer without a Resettable input stream");
+      }
       return new BlobDeserializer(context, in);
     }
 
