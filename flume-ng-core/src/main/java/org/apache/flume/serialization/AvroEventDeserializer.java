@@ -33,14 +33,13 @@ import org.apache.commons.codec.binary.Hex;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.FlumeException;
-import org.apache.flume.annotations.InterfaceAudience;
-import org.apache.flume.annotations.InterfaceStability;
 import org.apache.flume.event.EventBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
@@ -55,13 +54,12 @@ public class AvroEventDeserializer implements EventDeserializer {
       (AvroEventDeserializer.class);
 
   private final AvroSchemaType schemaType;
-  private final ResettableInputStream ris;
+  private final InputStream in;
 
   private Schema schema;
-  private byte[] schemaHash;
   private String schemaHashString;
   private DataFileReader<GenericRecord> fileReader;
-  private GenericDatumWriter datumWriter;
+  private GenericDatumWriter<GenericRecord> datumWriter;
   private GenericRecord record;
   private ByteArrayOutputStream out;
   private BinaryEncoder encoder;
@@ -78,9 +76,8 @@ public class AvroEventDeserializer implements EventDeserializer {
   public static final String AVRO_SCHEMA_HEADER_LITERAL
       = "flume.avro.schema.literal";
 
-  private AvroEventDeserializer(Context context, ResettableInputStream ris) {
-    this.ris = ris;
-
+  private AvroEventDeserializer(Context context, InputStream in) {
+    this.in = in;
     schemaType = AvroSchemaType.valueOf(
         context.getString(CONFIG_SCHEMA_TYPE_KEY,
             AvroSchemaType.HASH.toString()).toUpperCase());
@@ -94,7 +91,7 @@ public class AvroEventDeserializer implements EventDeserializer {
   }
 
   private void initialize() throws IOException, NoSuchAlgorithmException {
-    SeekableResettableInputBridge in = new SeekableResettableInputBridge(ris);
+    SeekableInputBridge in = new SeekableInputBridge(this.in);
     long pos = in.tell();
     in.seek(0L);
     fileReader = new DataFileReader<GenericRecord>(in,
@@ -102,11 +99,11 @@ public class AvroEventDeserializer implements EventDeserializer {
     fileReader.sync(pos);
 
     schema = fileReader.getSchema();
-    datumWriter = new GenericDatumWriter(schema);
+    datumWriter = new GenericDatumWriter<GenericRecord>(schema);
     out = new ByteArrayOutputStream();
     encoder = EncoderFactory.get().binaryEncoder(out, encoder);
 
-    schemaHash = SchemaNormalization.parsingFingerprint("CRC-64-AVRO", schema);
+    byte[] schemaHash = SchemaNormalization.parsingFingerprint("CRC-64-AVRO", schema);
     schemaHashString = Hex.encodeHexString(schemaHash);
   }
 
@@ -145,27 +142,27 @@ public class AvroEventDeserializer implements EventDeserializer {
   public void mark() throws IOException {
     long pos = fileReader.previousSync() - DataFileConstants.SYNC_SIZE;
     if (pos < 0) pos = 0;
-    ((RemoteMarkable) ris).markPosition(pos);
+    ((Seekable) in).mark(pos);
   }
 
   @Override
   public void reset() throws IOException {
-    long pos = ((RemoteMarkable) ris).getMarkPosition();
+    long pos = ((Seekable) in).point();
     fileReader.sync(pos);
   }
 
   @Override
   public void close() throws IOException {
-    ris.close();
+    in.close();
   }
 
   public static class Builder implements EventDeserializer.Builder {
 
     @Override
-    public EventDeserializer build(Context context, ResettableInputStream in) {
-      if (!(in instanceof RemoteMarkable)) {
+    public EventDeserializer build(Context context, InputStream in) {
+      if (!(in instanceof Seekable)) {
         throw new IllegalArgumentException("Cannot use this deserializer " +
-            "without a RemoteMarkable input stream");
+            "without a Seekable input stream");
       }
       AvroEventDeserializer deserializer
           = new AvroEventDeserializer(context, in);
@@ -178,42 +175,37 @@ public class AvroEventDeserializer implements EventDeserializer {
     }
   }
 
-  private static class SeekableResettableInputBridge implements SeekableInput {
+  private static class SeekableInputBridge implements SeekableInput {
 
-    ResettableInputStream ris;
-    public SeekableResettableInputBridge(ResettableInputStream ris) {
-      this.ris = ris;
+    InputStream in;
+
+    public SeekableInputBridge(InputStream in) {
+      this.in = in;
     }
 
     @Override
     public void seek(long p) throws IOException {
-      ris.seek(p);
+      ((Seekable) in).seek(p);
     }
 
     @Override
     public long tell() throws IOException {
-      return ris.tell();
+      return ((Seekable) in).tell();
     }
 
     @Override
     public long length() throws IOException {
-      if (ris instanceof LengthMeasurable) {
-        return ((LengthMeasurable) ris).length();
-      } else {
-        // FIXME: Avro doesn't seem to complain about this,
-        // but probably not a great idea...
-        return Long.MAX_VALUE;
-      }
+      return ((Seekable) in).length();
     }
 
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
-      return ris.read(b, off, len);
+      return in.read(b, off, len);
     }
 
     @Override
     public void close() throws IOException {
-      ris.close();
+      in.close();
     }
   }
 

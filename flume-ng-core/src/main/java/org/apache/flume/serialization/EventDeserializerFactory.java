@@ -26,6 +26,8 @@ import org.apache.flume.annotations.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
+
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public class EventDeserializerFactory {
@@ -33,8 +35,9 @@ public class EventDeserializerFactory {
   private static final Logger logger =
       LoggerFactory.getLogger(EventDeserializerFactory.class);
 
+  @SuppressWarnings("unchecked")
   public static EventDeserializer getInstance(
-      String deserializerType, Context context, ResettableInputStream in) {
+      String deserializerType, Context context, InputStream in) {
 
     Preconditions.checkNotNull(deserializerType,
         "serializer type must not be null");

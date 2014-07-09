@@ -17,14 +17,15 @@
  */
 package org.apache.flume.serialization;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.List;
-
 import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.annotations.InterfaceAudience;
 import org.apache.flume.annotations.InterfaceStability;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
 
 /**
  * Establishes a contract for reading events stored in arbitrary formats from
@@ -88,7 +89,9 @@ public interface EventDeserializer extends Resettable, Closeable {
    * <b>Note: Implementations MUST provide a public a no-arg constructor.</b>
    */
   public interface Builder {
-    public EventDeserializer build(Context context, ResettableInputStream in);
+
+    public EventDeserializer build(Context context, InputStream in);
+
   }
 
 }
