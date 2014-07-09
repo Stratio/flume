@@ -14,25 +14,20 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
-package org.apache.flume.serialization;
+ */package org.apache.flume.serialization;
 
 import java.io.IOException;
 
-/** Allows for calling mark() without a seek() */
-public interface RemoteMarkable {
+public class TestSeekableBufferedByteArrayInputStream extends TestSeekableBufferedInputStream<SeekableBufferedByteArrayInputStream> {
 
-  /**
-   * Indicate that the specified position should be returned to in the case of
-   * {@link Resettable#reset()} being called.
-   * @throws java.io.IOException
-   */
-  void markPosition(long position) throws IOException;
+  @Override
+  protected SeekableBufferedByteArrayInputStream newInputStream(byte[] contents) throws IOException {
+    return new SeekableBufferedByteArrayInputStream(contents);
+  }
 
-  /**
-   * Return the saved mark position without moving the mark pointer.
-   * @throws IOException
-   */
-  long getMarkPosition() throws IOException;
+  @Override
+  protected SeekableBufferedByteArrayInputStream newInputStream(byte[] contents, int chunkSize) throws IOException {
+    return new SeekableBufferedByteArrayInputStream(contents, chunkSize);
+  }
 
 }

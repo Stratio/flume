@@ -23,9 +23,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.filefilter.IOFileFilter;
-import org.apache.commons.lang.StringUtils;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.FlumeException;
@@ -42,8 +39,9 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -90,10 +88,8 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
   private final String fileNameHeader;
   private final String baseNameHeader;
   private final String deletePolicy;
-  private final Charset inputCharset;
-  private final DecodeErrorPolicy decodeErrorPolicy;
   private final ConsumeOrder consumeOrder;    
-  
+
   private Optional<FileInfo> currentFile = Optional.absent();
   /** Always contains the last file from which lines have been read. **/
   private Optional<FileInfo> lastFileRead = Optional.absent();
@@ -107,9 +103,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
       boolean annotateFileName, String fileNameHeader,
       boolean annotateBaseName, String baseNameHeader,
       String deserializerType, Context deserializerContext,
-      String deletePolicy, String inputCharset,
-      DecodeErrorPolicy decodeErrorPolicy, 
-      ConsumeOrder consumeOrder) throws IOException {
+      String deletePolicy, ConsumeOrder consumeOrder) throws IOException {
 
     // Sanity checks
     Preconditions.checkNotNull(spoolDirectory);
@@ -119,7 +113,6 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
     Preconditions.checkNotNull(deserializerType);
     Preconditions.checkNotNull(deserializerContext);
     Preconditions.checkNotNull(deletePolicy);
-    Preconditions.checkNotNull(inputCharset);
 
     // validate delete policy
     if (!deletePolicy.equalsIgnoreCase(DeletePolicy.NEVER.name()) &&
@@ -167,9 +160,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
     this.baseNameHeader = baseNameHeader;
     this.ignorePattern = Pattern.compile(ignorePattern);
     this.deletePolicy = deletePolicy;
-    this.inputCharset = Charset.forName(inputCharset);
-    this.decodeErrorPolicy = Preconditions.checkNotNull(decodeErrorPolicy);
-    this.consumeOrder = Preconditions.checkNotNull(consumeOrder);    
+    this.consumeOrder = Preconditions.checkNotNull(consumeOrder);
 
     File trackerDirectory = new File(trackerDirPath);
 
@@ -488,10 +479,11 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
           "Tracker target %s does not equal expected filename %s",
           tracker.getTarget(), nextPath);
 
-      ResettableInputStream in =
-          new ResettableFileInputStream(file, tracker,
-              ResettableFileInputStream.DEFAULT_BUF_SIZE, inputCharset,
-              decodeErrorPolicy);
+      SeekableReliableInputStream in =
+          new SeekableReliableInputStream(
+              new SeekableBufferedFileInputStream(file),
+              tracker);
+
       EventDeserializer deserializer = EventDeserializerFactory.getInstance
           (deserializerType, deserializerContext, in);
 
@@ -564,14 +556,9 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
     private Context deserializerContext = new Context();
     private String deletePolicy =
         SpoolDirectorySourceConfigurationConstants.DEFAULT_DELETE_POLICY;
-    private String inputCharset =
-        SpoolDirectorySourceConfigurationConstants.DEFAULT_INPUT_CHARSET;
-    private DecodeErrorPolicy decodeErrorPolicy = DecodeErrorPolicy.valueOf(
-        SpoolDirectorySourceConfigurationConstants.DEFAULT_DECODE_ERROR_POLICY
-            .toUpperCase(Locale.ENGLISH));
     private ConsumeOrder consumeOrder = 
         SpoolDirectorySourceConfigurationConstants.DEFAULT_CONSUME_ORDER;    
-    
+
     public Builder spoolDirectory(File directory) {
       this.spoolDirectory = directory;
       return this;
@@ -627,27 +614,16 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
       return this;
     }
 
-    public Builder inputCharset(String inputCharset) {
-      this.inputCharset = inputCharset;
-      return this;
-    }
-
-    public Builder decodeErrorPolicy(DecodeErrorPolicy decodeErrorPolicy) {
-      this.decodeErrorPolicy = decodeErrorPolicy;
-      return this;
-    }
-    
     public Builder consumeOrder(ConsumeOrder consumeOrder) {
       this.consumeOrder = consumeOrder;
       return this;
     }        
-    
+
     public ReliableSpoolingFileEventReader build() throws IOException {
       return new ReliableSpoolingFileEventReader(spoolDirectory, completedSuffix,
           ignorePattern, trackerDirPath, annotateFileName, fileNameHeader,
           annotateBaseName, baseNameHeader, deserializerType,
-          deserializerContext, deletePolicy, inputCharset, decodeErrorPolicy,
-          consumeOrder);
+          deserializerContext, deletePolicy, consumeOrder);
     }
   }
 
