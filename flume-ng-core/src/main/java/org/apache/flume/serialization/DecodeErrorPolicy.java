@@ -22,10 +22,50 @@ package org.apache.flume.serialization;
 import org.apache.flume.annotations.InterfaceAudience;
 import org.apache.flume.annotations.InterfaceStability;
 
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
+
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public enum DecodeErrorPolicy {
-  FAIL,
-  REPLACE,
-  IGNORE
+  FAIL {
+    @Override
+    protected CodingErrorAction toCodingErrorAction() {
+      return CodingErrorAction.REPORT;
+    }
+  },
+  REPLACE {
+    @Override
+    protected CodingErrorAction toCodingErrorAction() {
+      return CodingErrorAction.REPLACE;
+    }
+  },
+  IGNORE {
+    @Override
+    protected CodingErrorAction toCodingErrorAction() {
+      return CodingErrorAction.IGNORE;
+    }
+  };
+
+  /**
+   * Creates a new instance of {@link CharsetDecoder}
+   * for the given {@link Charset}.
+   * The new decoder's behavior concerning malformed input
+   * and unmappable characters depends on
+   * the enum instance on which this method is called.
+   * @param charset The character set to create a decoder for
+   * @return a new instance of {@link CharsetDecoder}
+   * for the given {@link Charset}.
+   */
+  public CharsetDecoder newDecoder(Charset charset) {
+    CharsetDecoder decoder = charset.newDecoder();
+    CodingErrorAction errorAction = toCodingErrorAction();
+    decoder.onMalformedInput(errorAction);
+    decoder.onUnmappableCharacter(errorAction);
+    return decoder;
+  }
+
+  protected abstract CodingErrorAction toCodingErrorAction();
+
 }

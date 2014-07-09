@@ -16,6 +16,7 @@
  */
 package org.apache.flume.sink.solr.morphline;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
 
@@ -23,7 +24,6 @@ import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.serialization.EventDeserializer;
 import org.apache.flume.serialization.EventDeserializerFactory;
-import org.apache.flume.serialization.ResettableInputStream;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -44,30 +44,43 @@ public class TestBlobDeserializer extends Assert {
 
   @Test
   public void testSimple() throws IOException {
-    ResettableInputStream in = new ResettableTestStringInputStream(mini);
+    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
     EventDeserializer des = new BlobDeserializer(new Context(), in);
     validateMiniParse(des);
   }
 
   @Test
   public void testSimpleViaBuilder() throws IOException {
-    ResettableInputStream in = new ResettableTestStringInputStream(mini);
+    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
     EventDeserializer.Builder builder = new BlobDeserializer.Builder();
     EventDeserializer des = builder.build(new Context(), in);
     validateMiniParse(des);
   }
 
+  @Test(expected = IllegalArgumentException.class)
+  public void testViaBuilderWithNotSeekable() throws IOException {
+    ByteArrayInputStream in = new ByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
+    EventDeserializer.Builder builder = new BlobDeserializer.Builder();
+    builder.build(new Context(), in);
+  }
+
   @Test
   public void testSimpleViaFactory() throws IOException {
-    ResettableInputStream in = new ResettableTestStringInputStream(mini);
+    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
     EventDeserializer des;
     des = EventDeserializerFactory.getInstance(BlobDeserializer.Builder.class.getName(), new Context(), in);
     validateMiniParse(des);
   }
 
+  @Test(expected = IllegalArgumentException.class)
+  public void testViaFactoryWithNotSeekable() throws IOException {
+    ByteArrayInputStream in = new ByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
+    EventDeserializerFactory.getInstance(BlobDeserializer.Builder.class.getName(), new Context(), in);
+  }
+
   @Test
   public void testBatch() throws IOException {
-    ResettableInputStream in = new ResettableTestStringInputStream(mini);
+    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
     EventDeserializer des = new BlobDeserializer(new Context(), in);
     List<Event> events;
 
@@ -86,7 +99,7 @@ public class TestBlobDeserializer extends Assert {
     Context ctx = new Context();
     ctx.put(BlobDeserializer.MAX_BLOB_LENGTH_KEY, "10");
 
-    ResettableInputStream in = new ResettableTestStringInputStream(longLine);
+    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(longLine.getBytes(Charsets.UTF_8));
     EventDeserializer des = new BlobDeserializer(ctx, in);
 
     assertEventBodyEquals("abcdefghij", des.readEvent());
@@ -105,12 +118,12 @@ public class TestBlobDeserializer extends Assert {
 
     des.mark();
     evt = des.readEvent();
-    assertEquals(new String(evt.getBody()), mini);
+    assertEquals(new String(evt.getBody(), Charsets.UTF_8), mini);
     des.reset(); // reset!
 
     evt = des.readEvent();
     assertEquals("data should be repeated, " +
-        "because we reset() the stream", new String(evt.getBody()), mini);
+        "because we reset() the stream", new String(evt.getBody(), Charsets.UTF_8), mini);
 
     evt = des.readEvent();
     assertNull("Event should be null because there are no lines " +
