@@ -964,17 +964,11 @@ consumeOrder          oldest          In which order files in the spooling direc
                                       very late if new files keep coming in the spooling directory.
 maxBackoff            4000            The maximum time (in millis) to wait between consecutive attempts to write to the channel(s) if the channel is full. The source will start at a low backoff and increase it exponentially each time the channel throws a ChannelException, upto the value specified by this parameter.
 batchSize             100             Granularity at which to batch transfer to the channel
-inputCharset          UTF-8           Character set used by deserializers that treat the input file as text.
-decodeErrorPolicy     ``FAIL``        What to do when we see a non-decodable character in the input file.
-                                      ``FAIL``: Throw an exception and fail to parse the file.
-                                      ``REPLACE``: Replace the unparseable character with the "replacement character" char,
-                                      typically Unicode U+FFFD.
-                                      ``IGNORE``: Drop the unparseable character sequence.
 deserializer          ``LINE``        Specify the deserializer used to parse the file into events.
                                       Defaults to parsing each line as an event. The class specified must implement
                                       ``EventDeserializer.Builder``.
-deserializer.*                        Varies per event deserializer.
-bufferMaxLines        --              (Obselete) This option is now ignored.
+deserializer.*                        Varies per event deserializer (see below).
+bufferMaxLines        --              (Obsolete) This option is now ignored.
 bufferMaxLineLength   5000            (Deprecated) Maximum length of a line in the commit buffer. Use deserializer.maxLineLength instead.
 selector.type         replicating     replicating or multiplexing
 selector.*                            Depends on the selector.type value
@@ -1011,7 +1005,13 @@ deserializer.maxLineLength      2048            Maximum number of characters to 
                                                 If a line exceeds this length, it is truncated, and the
                                                 remaining characters on the line will appear in a
                                                 subsequent event.
+deserializer.inputCharset       UTF-8           Charset to use for decoding text input.
 deserializer.outputCharset      UTF-8           Charset to use for encoding events put into the channel.
+deserializer.decodeErrorPolicy  ``FAIL``        What to do when we see a non-decodable character in the input file.
+                                                ``FAIL``: Throw an exception and fail to parse the file.
+                                                ``REPLACE``: Replace the unparseable character with the "replacement character" char,
+                                                typically Unicode U+FFFD.
+                                                ``IGNORE``: Drop the unparseable character sequence.
 ==============================  ==============  ==========================================================
 
 AVRO
