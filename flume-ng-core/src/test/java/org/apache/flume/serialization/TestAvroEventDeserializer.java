@@ -67,7 +67,9 @@ public class TestAvroEventDeserializer {
     AvroEventDeserializer.Builder desBuilder =
         new AvroEventDeserializer.Builder();
     EventDeserializer deserializer = desBuilder.build(new Context(),
-        new ResettableFileInputStream(tempFile, tracker));
+        new SeekableReliableInputStream(
+            new SeekableBufferedFileInputStream(tempFile),
+            tracker));
 
     BinaryDecoder decoder = null;
     DatumReader<GenericRecord> reader =
@@ -110,8 +112,10 @@ public class TestAvroEventDeserializer {
     context.put(AvroEventDeserializer.CONFIG_SCHEMA_TYPE_KEY,
         AvroEventDeserializer.AvroSchemaType.HASH.toString());
 
-    ResettableInputStream in =
-        new ResettableFileInputStream(tempFile, tracker);
+    SeekableReliableInputStream in =
+        new SeekableReliableInputStream(
+            new SeekableBufferedFileInputStream(tempFile),
+            tracker);
     EventDeserializer des =
         new AvroEventDeserializer.Builder().build(context, in);
 
@@ -136,8 +140,10 @@ public class TestAvroEventDeserializer {
     context.put(AvroEventDeserializer.CONFIG_SCHEMA_TYPE_KEY,
         AvroEventDeserializer.AvroSchemaType.LITERAL.toString());
 
-    ResettableInputStream in =
-        new ResettableFileInputStream(tempFile, tracker);
+    SeekableReliableInputStream in =
+        new SeekableReliableInputStream(
+            new SeekableBufferedFileInputStream(tempFile),
+            tracker);
     EventDeserializer des =
         new AvroEventDeserializer.Builder().build(context, in);
 
