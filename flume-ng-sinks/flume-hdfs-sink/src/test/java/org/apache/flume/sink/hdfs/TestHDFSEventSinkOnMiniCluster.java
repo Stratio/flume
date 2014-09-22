@@ -67,6 +67,19 @@ public class TestHDFSEventSinkOnMiniCluster {
     if (!dfsDir.isDirectory()) {
       dfsDir.mkdirs();
     }
+
+    // Ensure that DFS_DIR has rwxr-x-r-x permissions recursively
+    // Otherwise, MiniDFSCluster might fail
+    try {
+      new ProcessBuilder("setfacl", "-d", "-m", "u::rwx", DFS_DIR).start().waitFor();
+      new ProcessBuilder("setfacl", "-d", "-m", "g::rx", DFS_DIR).start().waitFor();
+      new ProcessBuilder("setfacl", "-d", "-m", "o::rx", DFS_DIR).start().waitFor();
+    } catch (IOException ex) {
+      logger.warn("Could not set DFS_DIR permissions correctly", ex);
+    } catch (InterruptedException ex) {
+      logger.warn("Could not set DFS_DIR permissions correctly", ex);
+    }
+
     // save off system prop to restore later
     oldTestBuildDataProp = System.getProperty(TEST_BUILD_DATA_KEY);
     System.setProperty(TEST_BUILD_DATA_KEY, DFS_DIR);
