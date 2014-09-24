@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * A deserializer that parses text lines from a supplied {@link Seekable} {@link InputStream}.
@@ -73,7 +74,7 @@ public class LineDeserializer implements EventDeserializer {
     Preconditions.checkNotNull(inputCharset);
     DecodeErrorPolicy decodeErrorPolicy = DecodeErrorPolicy.valueOf(
         context.getString(DECODE_ERROR_POLICY, DEFAULT_DECODE_ERROR_POLICY)
-            .toUpperCase());
+            .toUpperCase(Locale.ENGLISH));
     Preconditions.checkNotNull(decodeErrorPolicy);
     CharsetDecoder decoder = decodeErrorPolicy.newDecoder(inputCharset);
     this.in = new ResettableLineReader(new ResettableInputStreamReader(in, decoder));

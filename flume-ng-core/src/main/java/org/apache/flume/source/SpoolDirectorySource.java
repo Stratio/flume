@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -156,7 +157,7 @@ Configurable, EventDrivenSource {
         "."));
     
     consumeOrder = ConsumeOrder.valueOf(context.getString(CONSUME_ORDER, 
-        DEFAULT_CONSUME_ORDER.toString()).toUpperCase());
+        DEFAULT_CONSUME_ORDER.toString()).toUpperCase(Locale.ENGLISH));
 
     // "Hack" to support backwards compatibility with previous generation of
     // spooling directory source, which did not support deserializers

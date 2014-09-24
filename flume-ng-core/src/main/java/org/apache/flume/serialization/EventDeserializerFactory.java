@@ -27,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
+import java.util.Locale;
 
 @InterfaceAudience.Private
 @InterfaceStability.Stable
@@ -45,7 +46,7 @@ public class EventDeserializerFactory {
     // try to find builder class in enum of known output serializers
     EventDeserializerType type;
     try {
-      type = EventDeserializerType.valueOf(deserializerType.toUpperCase());
+      type = EventDeserializerType.valueOf(deserializerType.toUpperCase(Locale.ENGLISH));
     } catch (IllegalArgumentException e) {
       logger.debug("Not in enum, loading builder class: {}", deserializerType);
       type = EventDeserializerType.OTHER;

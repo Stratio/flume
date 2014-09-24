@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * A deserializer that parses Avro container files, generating one Flume event
@@ -80,7 +81,7 @@ public class AvroEventDeserializer implements EventDeserializer {
     this.in = in;
     schemaType = AvroSchemaType.valueOf(
         context.getString(CONFIG_SCHEMA_TYPE_KEY,
-            AvroSchemaType.HASH.toString()).toUpperCase());
+            AvroSchemaType.HASH.toString()).toUpperCase(Locale.ENGLISH));
     if (schemaType == AvroSchemaType.LITERAL) {
       logger.warn(CONFIG_SCHEMA_TYPE_KEY + " set to " +
           AvroSchemaType.LITERAL.toString() + ", so storing full Avro " +
