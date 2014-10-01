@@ -544,7 +544,17 @@ public class TestFileChannelRestart extends TestFileChannelBase {
     Assert.assertTrue(channel.isOpen());
     Set<String> in = putEvents(channel, "restart", 10, 100);
     Assert.assertEquals(100, in.size());
-    forceCheckpoint(channel);
+    try {
+      forceCheckpoint(channel);
+    } catch (ReflectionError ex) {
+      //XXX: This is happening when running in slow systems (e.g. Travis CI)
+      //     but it should be inocuous, so we try at least once more.
+      if (ex.getCause().getMessage().startsWith("Previous backup of checkpoint files is still in progress")) {
+        forceCheckpoint(channel);
+      } else {
+        throw ex;
+      }
+    }
     if(backup) {
       Thread.sleep(2000);
     }
