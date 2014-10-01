@@ -190,7 +190,7 @@ public class TestLog {
   public void doTestMinimumRequiredSpaceTooSmallForPut() throws IOException,
     InterruptedException {
     long minimumRequiredSpace = checkpointDir.getUsableSpace() -
-        (10L* 1024L * 1024L);
+        (20L* 1024L * 1024L);
     log.close();
     log = new Log.Builder().setCheckpointInterval(
         Long.MAX_VALUE).setMaxFileSize(
