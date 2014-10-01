@@ -28,6 +28,7 @@ import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,6 +176,7 @@ public class TestLog {
    * There is a race here in that someone could take up some space
    */
   @Test
+  @Ignore("Race conditions are common for this test: FLUME-2483")
   public void testMinimumRequiredSpaceTooSmallForPut() throws IOException,
     InterruptedException {
     try {
@@ -190,7 +192,7 @@ public class TestLog {
   public void doTestMinimumRequiredSpaceTooSmallForPut() throws IOException,
     InterruptedException {
     long minimumRequiredSpace = checkpointDir.getUsableSpace() -
-        (10L* 1024L * 1024L);
+        (100L* 1024L * 1024L);
     log.close();
     log = new Log.Builder().setCheckpointInterval(
         Long.MAX_VALUE).setMaxFileSize(
