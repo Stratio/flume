@@ -100,6 +100,8 @@ public class TestResettableInputStreamReader {
    */
   private static final byte[] ASCII_INVALID_SEQUENCE = new byte[]{(byte) 0x81};
 
+  private static final char UTF_8_REPLACEMENT_CHAR = '\uFFFD';
+
   private ResettableInputStreamReader r;
 
   private ResettableInputStreamReaderBuilder builder;
@@ -506,7 +508,7 @@ public class TestResettableInputStreamReader {
         .append(UTF_8_MALFORMED_SEQUENCE)
         .append("bar")
         .build();
-    assertEquals("foo?bar", IOUtils.toString(r));
+    assertEquals("foo" + UTF_8_REPLACEMENT_CHAR + "bar", IOUtils.toString(r));
   }
 
   /**
@@ -522,7 +524,7 @@ public class TestResettableInputStreamReader {
         .append(UTF_8_DANGLING_SURROGATE)
         .append("bar")
         .build();
-    assertEquals("foo?bar", IOUtils.toString(r));
+    assertEquals("foo" + UTF_8_REPLACEMENT_CHAR + "bar", IOUtils.toString(r));
   }
 
   /**
@@ -538,7 +540,7 @@ public class TestResettableInputStreamReader {
         .append(UTF_8_OVERLY_LONG_SEQUENCE)
         .append("bar")
         .build();
-    assertEquals("foo???bar", IOUtils.toString(r));
+    assertEquals("foo" + UTF_8_REPLACEMENT_CHAR + UTF_8_REPLACEMENT_CHAR + UTF_8_REPLACEMENT_CHAR + "bar", IOUtils.toString(r));
   }
 
   /**
@@ -556,7 +558,7 @@ public class TestResettableInputStreamReader {
         .charset(UTF_8)
         .append("bar")
         .build();
-    assertEquals("foo?bar", IOUtils.toString(r));
+    assertEquals("foo" + UTF_8_REPLACEMENT_CHAR + "bar", IOUtils.toString(r));
   }
 
   /**
@@ -572,7 +574,7 @@ public class TestResettableInputStreamReader {
         .append(UTF_8_NON_UNICODE_SEQUENCE)
         .append("bar")
         .build();
-    assertEquals("foo?bar", IOUtils.toString(r));
+    assertEquals("foo" + UTF_8_REPLACEMENT_CHAR + "bar", IOUtils.toString(r));
   }
 
   /**
@@ -678,7 +680,7 @@ public class TestResettableInputStreamReader {
         .append(ASCII_INVALID_SEQUENCE)
         .append("bar")
         .build();
-    assertEquals("foo?bar", IOUtils.toString(r));
+    assertEquals("foo" + UTF_8_REPLACEMENT_CHAR + "bar", IOUtils.toString(r));
   }
 
   /**
@@ -911,7 +913,6 @@ public class TestResettableInputStreamReader {
       CharsetDecoder decoder = charset.newDecoder();
       decoder.onMalformedInput(action);
       decoder.onUnmappableCharacter(action);
-      decoder.replaceWith("?");
       return decoder;
     }
 
