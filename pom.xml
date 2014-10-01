@@ -736,6 +736,7 @@ limitations under the License.
                   <exclude>**/.classpath</exclude>
                   <exclude>**/.project</exclude>
                   <exclude>**/target/**</exclude>
+                  <exclude>.travis.yml</exclude>
                 </excludes>
               </configuration>
             </execution>
