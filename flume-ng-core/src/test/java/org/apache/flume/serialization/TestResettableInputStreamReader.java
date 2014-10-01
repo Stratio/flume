@@ -574,7 +574,16 @@ public class TestResettableInputStreamReader {
         .append(UTF_8_NON_UNICODE_SEQUENCE)
         .append("bar")
         .build();
-    assertEquals("foo" + UTF_8_REPLACEMENT_CHAR + "bar", IOUtils.toString(r));
+    //XXX: UTF-8 CharsetDecoder behaviour changes in Java 8.
+    final int javaVersion = Integer.parseInt(System.getProperty("java.version").split("\\.")[1]);
+    if (javaVersion < 8) {
+      assertEquals(
+          "foo" + UTF_8_REPLACEMENT_CHAR + "bar", IOUtils.toString(r));
+    } else {
+      assertEquals(
+          "foo" + UTF_8_REPLACEMENT_CHAR + UTF_8_REPLACEMENT_CHAR + UTF_8_REPLACEMENT_CHAR + UTF_8_REPLACEMENT_CHAR
+              + UTF_8_REPLACEMENT_CHAR + "bar", IOUtils.toString(r));
+    }
   }
 
   /**
