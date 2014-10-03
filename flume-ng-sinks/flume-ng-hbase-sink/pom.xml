@@ -24,6 +24,9 @@
   <build>
     <plugins>
       <plugin>
+        <artifactId>maven-failsafe-plugin</artifactId>
+      </plugin>
+      <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
       </plugin>
@@ -119,34 +122,9 @@
       </activation>
       <dependencies>
         <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-test</artifactId>
-          <scope>test</scope>
-        </dependency>
-        <!-- required because the hadoop-core pom is missing these deps
-            and MiniDFSCluster pulls in the webhdfs classes -->
-        <dependency>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-core</artifactId>
-          <scope>test</scope>
-        </dependency>
-        <dependency>
           <groupId>org.apache.hbase</groupId>
           <artifactId>hbase</artifactId>
           <optional>true</optional>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.hbase</groupId>
-          <artifactId>hbase</artifactId>
-          <classifier>tests</classifier>
-          <scope>test</scope>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.zookeeper</groupId>
-          <artifactId>zookeeper</artifactId>
-          <scope>test</scope>
         </dependency>
       </dependencies>
     </profile>
@@ -160,27 +138,9 @@
       </activation>
       <dependencies>
         <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-minicluster</artifactId>
-          <scope>test</scope>
-        </dependency>
-        <dependency>
           <groupId>org.apache.hbase</groupId>
           <artifactId>hbase</artifactId>
           <optional>true</optional>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.hbase</groupId>
-          <artifactId>hbase</artifactId>
-          <classifier>tests</classifier>
-          <scope>test</scope>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.zookeeper</groupId>
-          <artifactId>zookeeper</artifactId>
-          <scope>test</scope>
         </dependency>
       </dependencies>
     </profile>
@@ -194,59 +154,19 @@
       </activation>
       <dependencies>
         <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-minicluster</artifactId>
-          <scope>test</scope>
-        </dependency>
-
-        <dependency>
           <groupId>org.apache.hbase</groupId>
           <artifactId>hbase-client</artifactId>
           <optional>true</optional>
         </dependency>
-
-        <dependency>
-          <groupId>org.apache.hbase</groupId>
-          <artifactId>hbase-client</artifactId>
-          <classifier>tests</classifier>
-          <scope>test</scope>
-        </dependency>
-
-
-        <dependency>
-          <groupId>org.apache.hbase</groupId>
-          <artifactId>hbase-server</artifactId>
-          <scope>test</scope>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.hbase</groupId>
-          <artifactId>hbase-server</artifactId>
-          <classifier>tests</classifier>
-          <scope>test</scope>
-        </dependency>
-
         <!-- There should be no need for Flume to include the following two
          artifacts, but HBase pom has a bug which causes these to not get
          pulled in. So we have to pull it in. Ideally this should be optional,
          but making it optional causes build to fail.
         -->
-
         <dependency>
           <groupId>org.apache.hbase</groupId>
           <artifactId>hbase-common</artifactId>
           <optional>true</optional>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hbase</groupId>
-          <artifactId>hbase-testing-util</artifactId>
-          <scope>test</scope>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.zookeeper</groupId>
-          <artifactId>zookeeper</artifactId>
-          <scope>test</scope>
         </dependency>
       </dependencies>
     </profile>

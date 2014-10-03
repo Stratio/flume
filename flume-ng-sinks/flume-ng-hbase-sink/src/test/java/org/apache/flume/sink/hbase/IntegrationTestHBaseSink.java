@@ -18,7 +18,9 @@
  */
 package org.apache.flume.sink.hbase;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -26,11 +28,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.primitives.Longs;
+
 import org.apache.flume.Channel;
 import org.apache.flume.ChannelException;
 import org.apache.flume.Context;
@@ -43,7 +41,6 @@ import org.apache.flume.channel.MemoryChannel;
 import org.apache.flume.conf.Configurables;
 import org.apache.flume.event.EventBuilder;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Increment;
@@ -53,38 +50,38 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.ZKConfig;
 import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TestHBaseSink {
-  private static final Logger logger =
-      LoggerFactory.getLogger(TestHBaseSink.class);
+import com.google.common.base.Charsets;
+import com.google.common.base.Throwables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.primitives.Longs;
 
-  private static final HBaseTestingUtility testUtility = new HBaseTestingUtility();
+public class IntegrationTestHBaseSink {
+  private static final Logger logger =
+      LoggerFactory.getLogger(IntegrationTestHBaseSink.class);
+
   private static final String tableName = "TestHbaseSink";
   private static final String columnFamily = "TestColumnFamily";
   private static final String inColumn = "iCol";
   private static final String plCol = "pCol";
   private static final String valBase = "testing hbase sink: jham";
 
+  private HBaseTestingUtil testingUtil;
   private Configuration conf;
   private Context ctx;
+  private HTable htable;
 
-  @BeforeClass
-  public static void setUpOnce() throws Exception {
-    testUtility.startMiniCluster();
-  }
-
-  @AfterClass
-  public static void tearDownOnce() throws Exception {
-    testUtility.shutdownMiniCluster();
-  }
+  @Rule
+  public Timeout globalTimeout = new Timeout(5 * 60 * 1000);
 
   /**
    * Most common context setup for unit tests using
@@ -92,14 +89,24 @@ public class TestHBaseSink {
    */
   @Before
   public void setUp() throws IOException {
-    conf = new Configuration(testUtility.getConfiguration());
     ctx = new Context();
-    testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
+    testingUtil = new HBaseTestingUtil();
+    conf = testingUtil.conf;
+    testingUtil.deleteTable(tableName);
+    htable = testingUtil.createTable(tableName, columnFamily);
   }
 
   @After
   public void tearDown() throws IOException {
-    testUtility.deleteTable(tableName.getBytes());
+    testingUtil.deleteTable(tableName);
+    if (htable != null) {
+      try {
+        htable.close();
+      } catch (IOException ex) {
+        logger.warn("Exception while closing HTable", ex);
+      }
+    }
+    testingUtil.close();
   }
 
   /**
@@ -270,7 +277,7 @@ public class TestHBaseSink {
 
     // setUp() will create the table, so we delete it.
     logger.info("Deleting table {}", tableName);
-    testUtility.deleteTable(tableName.getBytes());
+    testingUtil.deleteTable(tableName);
 
     ctx.put("batchSize", "2");
     HBaseSink sink = new HBaseSink(conf);
@@ -292,19 +299,14 @@ public class TestHBaseSink {
     tx.close();
 
     logger.info("Starting sink and processing events");
-    try {
-      logger.info("Calling sink.start()");
-      sink.start(); // This method will throw.
+    logger.info("Calling sink.start()");
+    sink.start(); // This method will throw.
 
-      // We never get here, but we log in case the behavior changes.
-      logger.error("Unexpected error: Calling sink.process()");
-      sink.process();
-      logger.error("Unexpected error: Calling sink.stop()");
-      sink.stop();
-    } finally {
-      // Re-create the table so tearDown() doesn't throw.
-      testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
-    }
+    // We never get here, but we log in case the behavior changes.
+    logger.error("Unexpected error: Calling sink.process()");
+    sink.process();
+    logger.error("Unexpected error: Calling sink.stop()");
+    sink.stop();
 
     // FIXME: The test should never get here, the below code doesn't run.
     Assert.fail();
@@ -373,7 +375,7 @@ public class TestHBaseSink {
     Assert.assertEquals(2, found);
     out = results[2];
     Assert.assertArrayEquals(Longs.toByteArray(2), out);
-    testUtility.shutdownMiniCluster();
+    testingUtil.hbaseAdmin.shutdown();
     sink.process();
     sink.stop();
   }
@@ -605,7 +607,7 @@ public class TestHBaseSink {
     expectedCounts.put("r2:c3", 63L);
     HBaseSink.DebugIncrementsCallback cb = new CoalesceValidator(expectedCounts);
 
-    HBaseSink sink = new HBaseSink(testUtility.getConfiguration(), cb);
+    HBaseSink sink = new HBaseSink(conf, cb);
     Configurables.configure(sink, ctx);
     Channel channel = createAndConfigureMemoryChannel(sink);
 
@@ -627,7 +629,7 @@ public class TestHBaseSink {
     expectedCounts.put("r1:c1", 10L);
     HBaseSink.DebugIncrementsCallback cb = new CoalesceValidator(expectedCounts);
 
-    HBaseSink sink = new HBaseSink(testUtility.getConfiguration(), cb);
+    HBaseSink sink = new HBaseSink(conf, cb);
     Configurables.configure(sink, ctx);
     Channel channel = createAndConfigureMemoryChannel(sink);
 
@@ -644,7 +646,7 @@ public class TestHBaseSink {
   public void testBatchAware() throws EventDeliveryException {
     logger.info("Running testBatchAware()");
     initContextForIncrementHBaseSerializer();
-    HBaseSink sink = new HBaseSink(testUtility.getConfiguration());
+    HBaseSink sink = new HBaseSink(conf);
     Configurables.configure(sink, ctx);
     Channel channel = createAndConfigureMemoryChannel(sink);
 

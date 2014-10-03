@@ -33,6 +33,9 @@ limitations under the License.
   <build>
     <plugins>
       <plugin>
+        <artifactId>maven-failsafe-plugin</artifactId>
+      </plugin>
+      <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
       </plugin>
@@ -150,12 +153,6 @@ limitations under the License.
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-auth</artifactId>
           <optional>true</optional>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-minicluster</artifactId>
-          <scope>test</scope>
         </dependency>
 
       </dependencies>

@@ -34,7 +34,7 @@ import org.apache.flume.Sink.Status;
 import org.apache.flume.channel.MemoryChannel;
 import org.apache.flume.conf.Configurables;
 import org.apache.flume.event.EventBuilder;
-import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
@@ -42,18 +42,20 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.ZKConfig;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.primitives.Longs;
 
 import org.junit.After;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class TestAsyncHBaseSink {
-  private static HBaseTestingUtility testUtility = new HBaseTestingUtility();
+public class IntegrationTestAsyncHBaseSink {
+  private static final Logger logger =
+      LoggerFactory.getLogger(IntegrationTestHBaseSink.class);
 
   private static String tableName = "TestHbaseSink";
   private static String columnFamily = "TestColumnFamily";
@@ -62,12 +64,12 @@ public class TestAsyncHBaseSink {
   private static Context ctx = new Context();
   private static String valBase = "testing hbase sink: jham";
   private boolean deleteTable = true;
+  private HBaseTestingUtil testingUtil;
+  private Configuration conf;
+  private HTable htable;
 
-
-  @BeforeClass
-  public static void setUp() throws Exception {
-    testUtility.startMiniCluster();
-
+  @Before
+  public void setUp() throws Exception {
     Map<String, String> ctxMap = new HashMap<String, String>();
     ctxMap.put("table", tableName);
     ctxMap.put("columnFamily", columnFamily);
@@ -78,18 +80,22 @@ public class TestAsyncHBaseSink {
     ctxMap.put("keep-alive", "0");
     ctxMap.put("timeout", "10000");
     ctx.putAll(ctxMap);
-  }
-
-  @AfterClass
-  public static void tearDown() throws Exception {
-    testUtility.shutdownMiniCluster();
+    testingUtil = new HBaseTestingUtil();
+    conf = testingUtil.conf;
+    htable = testingUtil.createTable(tableName, columnFamily);
   }
 
   @After
-  public void tearDownTest() throws Exception {
-    if (deleteTable) {
-      testUtility.deleteTable(tableName.getBytes());
+  public void tearDown() throws Exception {
+    testingUtil.deleteTable(tableName);
+    if (htable != null) {
+      try {
+        htable.close();
+      } catch (IOException ex) {
+        logger.warn("Exception while closing HTable", ex);
+      }
     }
+    testingUtil.close();
   }
 
   @Test
@@ -103,10 +109,9 @@ public class TestAsyncHBaseSink {
     ctxMap.put("timeout", "10000");
     Context tmpctx = new Context();
     tmpctx.putAll(ctxMap);
-
-    testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
     deleteTable = true;
-    AsyncHBaseSink sink = new AsyncHBaseSink(testUtility.getConfiguration());
+
+    AsyncHBaseSink sink = new AsyncHBaseSink(conf);
     Configurables.configure(sink, tmpctx);
     Channel channel = new MemoryChannel();
     Configurables.configure(channel, tmpctx);
@@ -122,7 +127,7 @@ public class TestAsyncHBaseSink {
     Assert.assertFalse(sink.isConfNull());
     sink.process();
     sink.stop();
-    HTable table = new HTable(testUtility.getConfiguration(), tableName);
+    HTable table = new HTable(conf, tableName);
     byte[][] results = getResults(table, 1);
     byte[] out = results[0];
     Assert.assertArrayEquals(e.getBody(), out);
@@ -132,9 +137,8 @@ public class TestAsyncHBaseSink {
 
   @Test
   public void testOneEvent() throws Exception {
-    testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
     deleteTable = true;
-    AsyncHBaseSink sink = new AsyncHBaseSink(testUtility.getConfiguration());
+    AsyncHBaseSink sink = new AsyncHBaseSink(conf);
     Configurables.configure(sink, ctx);
     Channel channel = new MemoryChannel();
     Configurables.configure(channel, ctx);
@@ -150,7 +154,7 @@ public class TestAsyncHBaseSink {
     Assert.assertFalse(sink.isConfNull());
     sink.process();
     sink.stop();
-    HTable table = new HTable(testUtility.getConfiguration(), tableName);
+    HTable table = new HTable(conf, tableName);
     byte[][] results = getResults(table, 1);
     byte[] out = results[0];
     Assert.assertArrayEquals(e.getBody(), out);
@@ -160,9 +164,8 @@ public class TestAsyncHBaseSink {
 
   @Test
   public void testThreeEvents() throws Exception {
-    testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
     deleteTable = true;
-    AsyncHBaseSink sink = new AsyncHBaseSink(testUtility.getConfiguration());
+    AsyncHBaseSink sink = new AsyncHBaseSink(conf);
     Configurables.configure(sink, ctx);
     Channel channel = new MemoryChannel();
     Configurables.configure(channel, ctx);
@@ -179,7 +182,7 @@ public class TestAsyncHBaseSink {
     Assert.assertFalse(sink.isConfNull());
     sink.process();
     sink.stop();
-    HTable table = new HTable(testUtility.getConfiguration(), tableName);
+    HTable table = new HTable(conf, tableName);
     byte[][] results = getResults(table, 3);
     byte[] out;
     int found = 0;
@@ -201,9 +204,8 @@ public class TestAsyncHBaseSink {
   //for tests.
   @Test (expected = EventDeliveryException.class)
   public void testTimeOut() throws Exception {
-    testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
     deleteTable = true;
-    AsyncHBaseSink sink = new AsyncHBaseSink(testUtility.getConfiguration(),
+    AsyncHBaseSink sink = new AsyncHBaseSink(conf,
       true, false);
     Configurables.configure(sink, ctx);
     Channel channel = new MemoryChannel();
@@ -226,10 +228,9 @@ public class TestAsyncHBaseSink {
 
   @Test
   public void testMultipleBatches() throws Exception {
-    testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
     deleteTable = true;
     ctx.put("batchSize", "2");
-    AsyncHBaseSink sink = new AsyncHBaseSink(testUtility.getConfiguration());
+    AsyncHBaseSink sink = new AsyncHBaseSink(conf);
     Configurables.configure(sink, ctx);
     //Reset the context to a higher batchSize
     ctx.put("batchSize", "100");
@@ -254,7 +255,7 @@ public class TestAsyncHBaseSink {
     Assert.assertFalse(sink.isConfNull());
     sink.stop();
     Assert.assertEquals(2, count);
-    HTable table = new HTable(testUtility.getConfiguration(), tableName);
+    HTable table = new HTable(conf, tableName);
     byte[][] results = getResults(table, 3);
     byte[] out;
     int found = 0;
@@ -285,9 +286,8 @@ public class TestAsyncHBaseSink {
 
   public void doTestMultipleBatchesBatchIncrements(boolean coalesce) throws
     Exception {
-    testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
     deleteTable = true;
-    AsyncHBaseSink sink = new AsyncHBaseSink(testUtility.getConfiguration(),
+    AsyncHBaseSink sink = new AsyncHBaseSink(conf,
       false, true);
     if (coalesce) {
       ctx.put(HBaseSinkConfigurationConstants.CONFIG_COALESCE_INCREMENTS,
@@ -327,7 +327,7 @@ public class TestAsyncHBaseSink {
     Assert.assertFalse(sink.isConfNull());
     sink.stop();
     Assert.assertEquals(7, count);
-    HTable table = new HTable(testUtility.getConfiguration(), tableName);
+    HTable table = new HTable(conf, tableName);
     Scan scan = new Scan();
     scan.addColumn(columnFamily.getBytes(),"test".getBytes());
     scan.setStartRow(Bytes.toBytes(valBase));
@@ -353,13 +353,12 @@ public class TestAsyncHBaseSink {
 
   @Test
   public void testWithoutConfigurationObject() throws Exception{
-    testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
     deleteTable = true;
     ctx.put("batchSize", "2");
     ctx.put(HBaseSinkConfigurationConstants.ZK_QUORUM,
-            ZKConfig.getZKQuorumServersString(testUtility.getConfiguration()) );
+            ZKConfig.getZKQuorumServersString(conf));
     ctx.put(HBaseSinkConfigurationConstants.ZK_ZNODE_PARENT,
-      testUtility.getConfiguration().get(HConstants.ZOOKEEPER_ZNODE_PARENT));
+      conf.get(HConstants.ZOOKEEPER_ZNODE_PARENT));
     AsyncHBaseSink sink = new AsyncHBaseSink();
     Configurables.configure(sink, ctx);
     // Reset context to values usable by other tests.
@@ -391,7 +390,7 @@ public class TestAsyncHBaseSink {
     Assert.assertTrue(sink.isConfNull());
     sink.stop();
     Assert.assertEquals(2, count);
-    HTable table = new HTable(testUtility.getConfiguration(), tableName);
+    HTable table = new HTable(conf, tableName);
     byte[][] results = getResults(table, 3);
     byte[] out;
     int found = 0;
@@ -412,13 +411,14 @@ public class TestAsyncHBaseSink {
   public void testMissingTable() throws Exception {
     deleteTable = false;
     ctx.put("batchSize", "2");
-    AsyncHBaseSink sink = new AsyncHBaseSink(testUtility.getConfiguration());
+    AsyncHBaseSink sink = new AsyncHBaseSink(conf);
     Configurables.configure(sink, ctx);
     //Reset the context to a higher batchSize
     ctx.put("batchSize", "100");
     Channel channel = new MemoryChannel();
     Configurables.configure(channel, ctx);
     sink.setChannel(channel);
+    testingUtil.deleteTable(tableName);
     sink.start();
     Transaction tx = channel.getTransaction();
     tx.begin();
@@ -430,8 +430,7 @@ public class TestAsyncHBaseSink {
     tx.close();
     sink.process();
     Assert.assertFalse(sink.isConfNull());
-    HTable table = new HTable(testUtility.getConfiguration(), tableName);
-    byte[][] results = getResults(table, 2);
+    byte[][] results = getResults(htable, 2);
     byte[] out;
     int found = 0;
     for(int i = 0; i < 2; i++){
@@ -460,9 +459,8 @@ public class TestAsyncHBaseSink {
   @Test(expected = EventDeliveryException.class)
   public void testHBaseFailure() throws Exception {
     ctx.put("batchSize", "2");
-    testUtility.createTable(tableName.getBytes(), columnFamily.getBytes());
     deleteTable = false;
-    AsyncHBaseSink sink = new AsyncHBaseSink(testUtility.getConfiguration());
+    AsyncHBaseSink sink = new AsyncHBaseSink(conf);
     Configurables.configure(sink, ctx);
     //Reset the context to a higher batchSize
     ctx.put("batchSize", "100");
@@ -480,7 +478,7 @@ public class TestAsyncHBaseSink {
     tx.close();
     sink.process();
     Assert.assertFalse(sink.isConfNull());
-    HTable table = new HTable(testUtility.getConfiguration(), tableName);
+    HTable table = new HTable(conf, tableName);
     byte[][] results = getResults(table, 2);
     byte[] out;
     int found = 0;
@@ -495,7 +493,7 @@ public class TestAsyncHBaseSink {
     Assert.assertEquals(2, found);
     out = results[2];
     Assert.assertArrayEquals(Longs.toByteArray(2), out);
-    testUtility.shutdownMiniCluster();
+    testingUtil.hbaseAdmin.shutdown();
     sink.process();
     sink.stop();
   }
