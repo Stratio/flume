@@ -3,6 +3,10 @@ jdk:
   - oraclejdk8
   - oraclejdk7
   - openjdk7
+env:
+  - MAVEN_OPTS=""
+  - MAVEN_OPTS="-Dhadoop.profile=2"
+  - MAVEN_OPTS="-Dhadoop.profile=hbase-98"
 cache:
   directories:
     - $HOME/.m2
