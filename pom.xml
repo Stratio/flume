@@ -822,6 +822,13 @@ limitations under the License.
             </filesets>
           </configuration>
         </plugin>
+
+        <plugin>
+          <groupId>com.googlecode.maven-download-plugin</groupId>
+          <artifactId>download-maven-plugin</artifactId>
+          <version>1.2.0</version>
+        </plugin>
+
       </plugins>
 
     </pluginManagement>
