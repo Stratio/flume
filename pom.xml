@@ -694,6 +694,7 @@ limitations under the License.
           <configuration>
             <forkMode>always</forkMode>
             <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
+            <argLine>-Xss256k -Xms1G -Xmx2G</argLine>
             <redirectTestOutputToFile>true</redirectTestOutputToFile>
             <includes>
               <include>${test.include.pattern}</include>
