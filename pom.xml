@@ -46,10 +46,32 @@ limitations under the License.
     <avro.version>1.7.4</avro.version>
     <elasticsearch.version>0.90.1</elasticsearch.version>
 
-    <hadoop2.version>2.4.0</hadoop2.version>
+    <hadoop1.version>1.2.1</hadoop1.version>
+    <hadoop2.version>2.5.1</hadoop2.version>
+    <hbase94.version>0.94.24</hbase94.version>
+    <hbase98.version>0.98.7</hbase98.version>
     <thrift.version>0.7.0</thrift.version>
     <kite.version>0.15.0</kite.version>
     <hive.version>0.10.0</hive.version>
+
+    <apache.mirror>http://ftp.cixug.es/apache</apache.mirror>
+    <hadoop1.tarball.url>${apache.mirror}/hadoop/common/hadoop-${hadoop1.version}/hadoop-${hadoop1.version}-bin.tar.gz</hadoop1.tarball.url>
+    <hadoop1.tarball.md5>d9d9e9a5343cb741d78a3d4c22d0bb0f</hadoop1.tarball.md5>
+    <hadoop2.tarball.url>${apache.mirror}/hadoop/common/hadoop-${hadoop2.version}/hadoop-${hadoop2.version}.tar.gz</hadoop2.tarball.url>
+    <hadoop2.tarball.md5>015b12d790701deb4de9a647013f72a9</hadoop2.tarball.md5>
+
+    <!--TODO -->
+    <hadoop1.hbase94.tarball.url>${apache.mirror}/hbase/hbase-${hbase94.version}/hbase-${hbase94.version}.tar.gz</hadoop1.hbase94.tarball.url>
+    <hadoop1.hbase94.tarball.md5>6146ee48ba2c917bd47f8d2c03c05cd6</hadoop1.hbase94.tarball.md5>
+    <hadoop1.hbase98.tarball.url>${apache.mirror}/hbase/hbase-${hbase98.version}/hbase-${hbase98.version}-hadoop1-bin.tar.gz</hadoop1.hbase98.tarball.url>
+    <hadoop1.hbase98.tarball.md5>015b12d790701deb4de9a647013f72a9</hadoop1.hbase98.tarball.md5>
+
+    <!--XXX: hbase94 is actually built with Hadoop 1 -->
+    <hadoop2.hbase94.tarball.url>${apache.mirror}/hbase/hbase-${hbase94.version}/hbase-${hbase94.version}.tar.gz</hadoop2.hbase94.tarball.url>
+    <hadoop2.hbase94.tarball.md5>6146ee48ba2c917bd47f8d2c03c05cd6</hadoop2.hbase94.tarball.md5>
+    <hadoop2.hbase98.tarball.url>${apache.mirror}/hbase/hbase-${hbase98.version}/hbase-${hbase98.version}-hadoop2-bin.tar.gz</hadoop2.hbase98.tarball.url>
+    <hadoop2.hbase98.tarball.md5>a96233f399feb47bae8ca22929fdb1f5</hadoop2.hbase98.tarball.md5>
+
   </properties>
 
   <modules>
@@ -74,13 +96,18 @@ limitations under the License.
       <id>hadoop-1.0</id>
       <activation>
         <property>
-          <name>!hadoop.profile</name>
+          <name>hadoop.profile</name>
+          <value>1</value>
         </property>
       </activation>
       <properties>
-        <hadoop.version>1.0.1</hadoop.version>
-        <hbase.version>0.92.1</hbase.version>
+        <hadoop.version>${hadoop1.version}</hadoop.version>
+        <hadoop.tarball.url>${hadoop1.tarball.url}</hadoop.tarball.url>
+        <hadoop.tarball.md5>${hadoop1.tarball.md5}</hadoop.tarball.md5>
         <hadoop.common.artifact.id>hadoop-core</hadoop.common.artifact.id>
+        <hbase.version>${hbase94.version}</hbase.version>
+        <hbase.tarball.url>${hadoop1.hbase94.tarball.url}</hbase.tarball.url>
+        <hbase.tarball.md5>${hadoop1.hbase94.tarball.md5}</hbase.tarball.md5>
         <thrift.version>0.7.0</thrift.version>
       </properties>
       <dependencyManagement>
@@ -95,6 +122,10 @@ limitations under the License.
             <artifactId>hadoop-test</artifactId>
             <version>${hadoop.version}</version>
           </dependency>
+
+          <!--
+            Ideally this should be optional, but making it optional causes build to fail.
+          -->
           <dependency>
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase</artifactId>
@@ -108,12 +139,7 @@ limitations under the License.
             <classifier>tests</classifier>
             <scope>test</scope>
           </dependency>
-          <dependency>
-            <groupId>org.apache.zookeeper</groupId>
-            <artifactId>zookeeper</artifactId>
-            <version>3.4.5</version>
-            <scope>test</scope>
-          </dependency>
+
         </dependencies>
       </dependencyManagement>
     </profile>
@@ -122,14 +148,17 @@ limitations under the License.
       <id>hadoop-2</id>
       <activation>
         <property>
-          <name>hadoop.profile</name>
-          <value>2</value>
+          <name>!hadoop.profile</name>
         </property>
       </activation>
       <properties>
         <hadoop.version>${hadoop2.version}</hadoop.version>
-        <hbase.version>0.94.2</hbase.version>
+        <hadoop.tarball.url>${hadoop2.tarball.url}</hadoop.tarball.url>
+        <hadoop.tarball.md5>${hadoop2.tarball.md5}</hadoop.tarball.md5>
         <hadoop.common.artifact.id>hadoop-common</hadoop.common.artifact.id>
+        <hbase.version>${hbase98.version}-hadoop2</hbase.version>
+        <hbase.tarball.url>${hadoop2.hbase98.tarball.url}</hbase.tarball.url>
+        <hbase.tarball.md5>${hadoop2.hbase98.tarball.md5}</hbase.tarball.md5>
         <thrift.version>0.8.0</thrift.version>
       </properties>
       <dependencyManagement>
@@ -160,24 +189,19 @@ limitations under the License.
             <version>${hadoop.version}</version>
           </dependency>
 
+          <!-- Ideally this should be optional, but making it optional causes
+              build to fail.
+          -->
           <dependency>
             <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase</artifactId>
+            <artifactId>hbase-client</artifactId>
             <version>${hbase.version}</version>
           </dependency>
-
           <dependency>
             <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase</artifactId>
+            <artifactId>hbase-client</artifactId>
             <version>${hbase.version}</version>
             <classifier>tests</classifier>
-            <scope>test</scope>
-          </dependency>
-
-          <dependency>
-            <groupId>org.apache.zookeeper</groupId>
-            <artifactId>zookeeper</artifactId>
-            <version>3.4.5</version>
             <scope>test</scope>
           </dependency>
 
@@ -192,17 +216,21 @@ limitations under the License.
     </profile>
 
     <profile>
-      <id>hbase-98</id>
+      <id>hbase-94-hadoop-2</id>
       <activation>
         <property>
           <name>hadoop.profile</name>
-          <value>hbase-98</value>
+          <value>2-hbase94</value>
         </property>
       </activation>
       <properties>
         <hadoop.version>${hadoop2.version}</hadoop.version>
-        <hbase.version>0.98.2-hadoop2</hbase.version>
+        <hadoop.tarball.url>${hadoop2.tarball.url}</hadoop.tarball.url>
+        <hadoop.tarball.md5>${hadoop2.tarball.md5}</hadoop.tarball.md5>
         <hadoop.common.artifact.id>hadoop-common</hadoop.common.artifact.id>
+        <hbase.version>${hbase94.version}</hbase.version>
+        <hbase.tarball.url>${hadoop2.hbase94.tarball.url}</hbase.tarball.url>
+        <hbase.tarball.md5>${hadoop2.hbase94.tarball.md5}</hbase.tarball.md5>
         <thrift.version>0.8.0</thrift.version>
       </properties>
       <dependencyManagement>
@@ -215,11 +243,6 @@ limitations under the License.
           <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
-            <version>${hadoop.version}</version>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-minicluster</artifactId>
             <version>${hadoop.version}</version>
           </dependency>
           <dependency>
@@ -237,75 +260,21 @@ limitations under the License.
             <artifactId>hadoop-auth</artifactId>
             <version>${hadoop.version}</version>
           </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-minicluster</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>test</scope>
-          </dependency>
 
           <!-- Ideally this should be optional, but making it optional causes
           build to fail.
           -->
           <dependency>
             <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-client</artifactId>
+            <artifactId>hbase</artifactId>
             <version>${hbase.version}</version>
           </dependency>
 
           <dependency>
             <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-client</artifactId>
+            <artifactId>hbase</artifactId>
             <version>${hbase.version}</version>
             <classifier>tests</classifier>
-            <scope>test</scope>
-          </dependency>
-
-          <dependency>
-            <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-testing-util</artifactId>
-            <version>${hbase.version}</version>
-          </dependency>
-
-          <!-- There should be no need for Flume to include the following two
-           artifacts, but HBase pom has a bug which causes these to not get
-           pulled in. So we have to pull it in. Ideally this should be optional,
-           but making it optional causes build to fail.
-          -->
-
-          <dependency>
-            <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-common</artifactId>
-            <version>${hbase.version}</version>
-          </dependency>
-
-          <dependency>
-            <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-common</artifactId>
-            <version>${hbase.version}</version>
-            <classifier>tests</classifier>
-            <scope>test</scope>
-          </dependency>
-
-          <dependency>
-            <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-server</artifactId>
-            <version>${hbase.version}</version>
-            <scope>test</scope>
-          </dependency>
-
-          <dependency>
-            <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-server</artifactId>
-            <version>${hbase.version}</version>
-            <classifier>tests</classifier>
-            <scope>test</scope>
-          </dependency>
-
-          <dependency>
-            <groupId>org.apache.zookeeper</groupId>
-            <artifactId>zookeeper</artifactId>
-            <version>3.4.5</version>
             <scope>test</scope>
           </dependency>
 
@@ -313,7 +282,7 @@ limitations under the License.
           <dependency>
             <groupId>org.apache.flume.flume-ng-sinks</groupId>
             <artifactId>flume-dataset-sink</artifactId>
-            <version>${project.version}</version>
+            <version>1.6.0-SNAPSHOT</version>
           </dependency>
         </dependencies>
       </dependencyManagement>
@@ -1379,6 +1348,12 @@ limitations under the License.
         <artifactId>curator-test</artifactId>
         <version>2.6.0</version>
         <scope>test</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.zookeeper</groupId>
+        <artifactId>zookeeper</artifactId>
+        <version>3.4.6</version>
       </dependency>
 
     </dependencies>

@@ -77,7 +77,8 @@ limitations under the License.
       <id>hadoop-1.0</id>
       <activation>
         <property>
-          <name>!hadoop.profile</name>
+          <name>hadoop.profile</name>
+          <value>1</value>
         </property>
       </activation>
       <dependencies>
@@ -103,8 +104,7 @@ limitations under the License.
       <id>hadoop-2</id>
       <activation>
         <property>
-          <name>hadoop.profile</name>
-          <value>2</value>
+          <name>!hadoop.profile</name>
         </property>
       </activation>
       <dependencies>
@@ -119,12 +119,6 @@ limitations under the License.
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-auth</artifactId>
           <optional>true</optional>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-minicluster</artifactId>
-          <scope>test</scope>
         </dependency>
 
       </dependencies>

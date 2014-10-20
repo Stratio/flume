@@ -30,6 +30,25 @@
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
       </plugin>
+      <plugin>
+        <groupId>com.googlecode.maven-download-plugin</groupId>
+        <artifactId>download-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>download-hbase</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>wget</goal>
+            </goals>
+            <configuration>
+              <url>${hbase.tarball.url}</url>
+              <unpack>true</unpack>
+              <outputDirectory>${project.basedir}/../../target/tmp/hbase-${hbase.version}</outputDirectory>
+              <md5>${hbase.tarball.md5}</md5>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
   <dependencies>
@@ -114,10 +133,11 @@
 
   <profiles>
     <profile>
-      <id>hadoop-1.0</id>
+      <id>hadoop-1</id>
       <activation>
         <property>
-          <name>!hadoop.profile</name>
+          <name>hadoop.profile</name>
+          <value>1</value>
         </property>
       </activation>
       <dependencies>
@@ -132,8 +152,23 @@
       <id>hadoop-2</id>
       <activation>
         <property>
+          <name>!hadoop.profile</name>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.hbase</groupId>
+          <artifactId>hbase-client</artifactId>
+          <optional>true</optional>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>hbase-94</id>
+      <activation>
+        <property>
           <name>hadoop.profile</name>
-          <value>2</value>
+          <value>2-hbase94</value>
         </property>
       </activation>
       <dependencies>
@@ -144,32 +179,7 @@
         </dependency>
       </dependencies>
     </profile>
-    <profile>
-      <id>hbase-98</id>
-      <activation>
-        <property>
-          <name>hadoop.profile</name>
-          <value>hbase-98</value>
-        </property>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>org.apache.hbase</groupId>
-          <artifactId>hbase-client</artifactId>
-          <optional>true</optional>
-        </dependency>
-        <!-- There should be no need for Flume to include the following two
-         artifacts, but HBase pom has a bug which causes these to not get
-         pulled in. So we have to pull it in. Ideally this should be optional,
-         but making it optional causes build to fail.
-        -->
-        <dependency>
-          <groupId>org.apache.hbase</groupId>
-          <artifactId>hbase-common</artifactId>
-          <optional>true</optional>
-        </dependency>
-      </dependencies>
-    </profile>
+
   </profiles>
 
 </project>

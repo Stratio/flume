@@ -68,8 +68,7 @@
       <id>hadoop-2</id>
       <activation>
         <property>
-          <name>hadoop.profile</name>
-          <value>2</value>
+          <name>!hadoop.profile</name>
         </property>
       </activation>
       <dependencies>
@@ -80,11 +79,11 @@
       </dependencies>
     </profile>
     <profile>
-      <id>hbase-98</id>
+      <id>hbase-94</id>
       <activation>
         <property>
           <name>hadoop.profile</name>
-          <value>hbase-98</value>
+          <value>hbase-94</value>
         </property>
       </activation>
       <dependencies>

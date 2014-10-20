@@ -39,27 +39,26 @@ limitations under the License.
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
       </plugin>
+      <plugin>
+        <groupId>com.googlecode.maven-download-plugin</groupId>
+        <artifactId>download-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>download-hadoop</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>wget</goal>
+            </goals>
+            <configuration>
+              <url>${hadoop.tarball.url}</url>
+              <unpack>true</unpack>
+              <outputDirectory>${project.basedir}/../../target/tmp/hadoop-${hadoop.version}</outputDirectory>
+              <md5>${hadoop.tarball.md5}</md5>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
-
-    <plugin>
-      <groupId>com.googlecode.maven-download-plugin</groupId>
-      <artifactId>download-maven-plugin</artifactId>
-      <executions>
-        <execution>
-          <id>distro-assembly</id>
-          <phase>prepare-package</phase>
-          <goals>
-            <goal>wget</goal>
-          </goals>
-          <configuration>
-            <url>http://ftp.cixug.es/apache/flume/1.5.0.1/apache-flume-1.5.0.1-bin.tar.gz</url>
-            <unpack>true</unpack>
-            <outputDirectory>${project.build.directory}</outputDirectory>
-            <md5>fa43105db822ce045f885a5ebc0f869e</md5>
-          </configuration>
-        </execution>
-      </executions>
-    </plugin>
 
   </build>
 
@@ -132,7 +131,8 @@ limitations under the License.
       <id>hadoop-1.0</id>
       <activation>
         <property>
-          <name>!hadoop.profile</name>
+          <name>hadoop.profile</name>
+          <value>1</value>
         </property>
       </activation>
       <dependencies>
@@ -158,57 +158,45 @@ limitations under the License.
       <id>hadoop-2</id>
       <activation>
         <property>
-          <name>hadoop.profile</name>
-          <value>2</value>
+          <name>!hadoop.profile</name>
         </property>
       </activation>
       <dependencies>
-
         <dependency>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-hdfs</artifactId>
           <optional>true</optional>
         </dependency>
-
         <dependency>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-auth</artifactId>
           <optional>true</optional>
         </dependency>
-
       </dependencies>
     </profile>
 
     <profile>
-      <id>hbase-98</id>
+      <id>hbase-94-hadoop-2</id>
       <activation>
         <property>
           <name>hadoop.profile</name>
-          <value>hbase-98</value>
+          <value>2-hbase94</value>
         </property>
       </activation>
       <dependencies>
-
         <dependency>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-hdfs</artifactId>
           <optional>true</optional>
         </dependency>
-
         <dependency>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-auth</artifactId>
           <optional>true</optional>
         </dependency>
-
-        <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-minicluster</artifactId>
-          <scope>test</scope>
-        </dependency>
-
       </dependencies>
     </profile>
+
   </profiles>
 
 </project>

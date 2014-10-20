@@ -32,12 +32,19 @@ import org.slf4j.LoggerFactory;
 
 public class HBaseTestingUtil implements Closeable {
 
-  private static final Logger logger = LoggerFactory.getLogger(IntegrationTestHBaseSink.class);
+  private static final Logger logger = LoggerFactory.getLogger(HBaseTestingUtil.class);
 
   Configuration conf;
   HBaseAdmin hbaseAdmin;
 
   public HBaseTestingUtil() throws IOException {
+    setUp();
+  }
+
+  public void setUp() throws IOException {
+    final ProcessBuilder pb = new ProcessBuilder();
+    pb.command("");
+
     conf = HBaseConfiguration.create();
     String zkQuorum = System.getProperty("hbase.zookeeper.quorum");
     if (zkQuorum == null) {
