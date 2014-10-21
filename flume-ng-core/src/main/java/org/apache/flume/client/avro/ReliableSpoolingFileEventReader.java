@@ -412,7 +412,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
    * If two or more files are equally old/young, then the file name with
    * lower lexicographical value is returned.
    * If the {@link #consumeOrder} variable is {@link ConsumeOrder#RANDOM}
-   * then cache the directory listing to amortize retreival cost, and return
+   * then cache the directory listing to amortize retrieval cost, and return
    * any arbitary file from the directory.
    */
   private Optional<FileInfo> getNextFile() {
