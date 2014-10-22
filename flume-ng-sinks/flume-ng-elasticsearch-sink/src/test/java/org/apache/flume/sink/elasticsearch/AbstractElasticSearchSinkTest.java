@@ -127,7 +127,7 @@ public abstract class AbstractElasticSearchSinkTest {
   void assertBodyQuery(int expectedHits, Event... events) {
     // Perform Multi Field Match
     assertSearch(expectedHits,
-        performSearch(QueryBuilders.fieldQuery("@message", "event")));
+        performSearch(QueryBuilders.queryString("@message:event")));
   }
 
   SearchResponse performSearch(QueryBuilder query) {
