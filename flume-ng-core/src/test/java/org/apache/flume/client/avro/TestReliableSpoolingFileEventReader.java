@@ -23,7 +23,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.apache.flume.Event;
 import org.apache.flume.client.avro.ReliableSpoolingFileEventReader.DeletePolicy;
 import org.apache.flume.source.SpoolDirectorySourceConfigurationConstants;

@@ -19,7 +19,7 @@
 package org.apache.flume.sink.elasticsearch;
 
 import com.google.common.collect.Maps;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flume.Event;
 import org.apache.flume.event.SimpleEvent;
 import org.joda.time.DateTimeUtils;
