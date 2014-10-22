@@ -43,8 +43,8 @@ public class TimeBasedIndexNameBuilderTest {
 
   @Test
   public void shouldUseUtcAsBasisForDateFormat() {
-    assertEquals("Coordinated Universal Time",
-            indexNameBuilder.getFastDateFormat().getTimeZone().getDisplayName());
+    assertEquals("Etc/UTC",
+            indexNameBuilder.getFastDateFormat().getTimeZone().getID());
   }
 
   @Test
