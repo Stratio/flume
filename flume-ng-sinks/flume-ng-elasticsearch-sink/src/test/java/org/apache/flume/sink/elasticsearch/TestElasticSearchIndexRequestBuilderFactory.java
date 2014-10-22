@@ -35,16 +35,17 @@ import org.apache.flume.event.SimpleEvent;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.io.BytesStream;
-import org.elasticsearch.common.io.FastByteArrayOutputStream;
+import org.elasticsearch.common.io.stream.BytesStreamOutput;
 import org.junit.Before;
 import org.junit.Test;
+import static org.mockito.Mockito.*;
 
 import com.google.common.collect.Maps;
 
 public class TestElasticSearchIndexRequestBuilderFactory
     extends AbstractElasticSearchSinkTest {
 
-  private static final Client FAKE_CLIENT = null;
+  private static final Client FAKE_CLIENT = mock(Client.class);
 
   private EventSerializerIndexRequestBuilderFactory factory;
 
@@ -196,7 +197,7 @@ public class TestElasticSearchIndexRequestBuilderFactory
 
     @Override
     public BytesStream getContentBuilder(Event event) throws IOException {
-      FastByteArrayOutputStream fbaos = new FastByteArrayOutputStream(4);
+      BytesStreamOutput fbaos = new BytesStreamOutput(4);
       fbaos.write(FAKE_BYTES);
       return fbaos;
     }
