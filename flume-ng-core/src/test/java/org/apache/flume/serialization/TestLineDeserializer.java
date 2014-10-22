@@ -24,7 +24,6 @@ import org.apache.flume.Event;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
 
@@ -42,53 +41,40 @@ public class TestLineDeserializer {
 
   @Test
   public void testSimple() throws IOException {
-    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
+    ResettableInputStream in = new ResettableTestStringInputStream(mini);
     EventDeserializer des = new LineDeserializer(new Context(), in);
-    validateMiniParse(des, LineDeserializer.DEFAULT_OUTPUT_CHARSET);
+    validateMiniParse(des);
   }
 
   @Test
   public void testSimpleViaBuilder() throws IOException {
-    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
+    ResettableInputStream in = new ResettableTestStringInputStream(mini);
     EventDeserializer.Builder builder = new LineDeserializer.Builder();
     EventDeserializer des = builder.build(new Context(), in);
-    validateMiniParse(des, LineDeserializer.DEFAULT_OUTPUT_CHARSET);
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testViaBuilderWithNotSeekable() throws IOException {
-    ByteArrayInputStream in = new ByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
-    EventDeserializer.Builder builder = new LineDeserializer.Builder();
-    builder.build(new Context(), in);
+    validateMiniParse(des);
   }
 
   @Test
   public void testSimpleViaFactory() throws IOException {
-    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
+    ResettableInputStream in = new ResettableTestStringInputStream(mini);
     EventDeserializer des;
     des = EventDeserializerFactory.getInstance("LINE", new Context(), in);
-    validateMiniParse(des, LineDeserializer.DEFAULT_OUTPUT_CHARSET);
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testViaFactoryWithNotSeekable() throws IOException {
-    ByteArrayInputStream in = new ByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
-    EventDeserializerFactory.getInstance("LINE", new Context(), in);
+    validateMiniParse(des);
   }
 
   @Test
   public void testBatch() throws IOException {
-    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
+    ResettableInputStream in = new ResettableTestStringInputStream(mini);
     EventDeserializer des = new LineDeserializer(new Context(), in);
     List<Event> events;
 
     events = des.readEvents(1); // only try to read 1
     Assert.assertEquals(1, events.size());
-    assertEventBodyEquals("line 1", events.get(0), LineDeserializer.DEFAULT_OUTPUT_CHARSET);
+    assertEventBodyEquals("line 1", events.get(0));
 
     events = des.readEvents(10); // try to read more than we should have
     Assert.assertEquals(1, events.size());
-    assertEventBodyEquals("line 2", events.get(0), LineDeserializer.DEFAULT_OUTPUT_CHARSET);
+    assertEventBodyEquals("line 2", events.get(0));
 
     des.mark();
     des.close();
@@ -101,52 +87,42 @@ public class TestLineDeserializer {
     Context ctx = new Context();
     ctx.put(LineDeserializer.MAXLINE_KEY, "10");
 
-    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(longLine.getBytes(Charsets.UTF_8));
+    ResettableInputStream in = new ResettableTestStringInputStream(longLine);
     EventDeserializer des = new LineDeserializer(ctx, in);
 
-    assertEventBodyEquals("abcdefghij", des.readEvent(), LineDeserializer.DEFAULT_OUTPUT_CHARSET);
-    assertEventBodyEquals("klmnopqrst", des.readEvent(), LineDeserializer.DEFAULT_OUTPUT_CHARSET);
-    assertEventBodyEquals("uvwxyz", des.readEvent(), LineDeserializer.DEFAULT_OUTPUT_CHARSET);
+    assertEventBodyEquals("abcdefghij", des.readEvent());
+    assertEventBodyEquals("klmnopqrst", des.readEvent());
+    assertEventBodyEquals("uvwxyz", des.readEvent());
     Assert.assertNull(des.readEvent());
   }
 
+  /*
+   * TODO: need test for output charset
   @Test
-  public void testAlternateInputCharset() throws IOException {
-    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_16));
-    Context context = new Context();
-    context.put(LineDeserializer.INPUT_CHARSET_KEY, "UTF-16");
-    EventDeserializer des = new LineDeserializer(context, in);
-    validateMiniParse(des, LineDeserializer.DEFAULT_OUTPUT_CHARSET);
-  }
+  public void testOutputCharset {
 
-  @Test
-  public void testAlternateOutputCharset() throws IOException {
-    SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
-    Context context = new Context();
-    context.put(LineDeserializer.OUTPUT_CHARSET_KEY, "ISO-8859-1");
-    EventDeserializer des = new LineDeserializer(context, in);
-    validateMiniParse(des, "ISO-8859-1");
   }
+  */
 
-  private void assertEventBodyEquals(String expected, Event event, String charset) throws IOException {
-    String bodyStr = new String(event.getBody(), charset);
+  private void assertEventBodyEquals(String expected, Event event) {
+    String bodyStr = new String(event.getBody(), Charsets.UTF_8);
     Assert.assertEquals(expected, bodyStr);
   }
 
-  private void validateMiniParse(EventDeserializer des, String charset) throws IOException {
+  private void validateMiniParse(EventDeserializer des) throws IOException {
     Event evt;
 
     evt = des.readEvent();
-    Assert.assertEquals("line 1", new String(evt.getBody(), charset));
+    Assert.assertEquals(new String(evt.getBody()), "line 1");
     des.mark();
 
     evt = des.readEvent();
-    Assert.assertEquals("line 2", new String(evt.getBody(), charset));
+    Assert.assertEquals(new String(evt.getBody()), "line 2");
     des.reset(); // reset!
 
     evt = des.readEvent();
     Assert.assertEquals("Line 2 should be repeated, " +
-        "because we reset() the stream", new String(evt.getBody(), charset), "line 2");
+        "because we reset() the stream", new String(evt.getBody()), "line 2");
 
     evt = des.readEvent();
     Assert.assertNull("Event should be null because there are no lines " +

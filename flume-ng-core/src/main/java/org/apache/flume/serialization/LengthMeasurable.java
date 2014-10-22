@@ -19,11 +19,9 @@ package org.apache.flume.serialization;
 
 import java.io.IOException;
 
-public class TestSeekableByteArrayInputStream extends TestSeekableInputStream<SeekableByteArrayInputStream> {
+public interface LengthMeasurable {
 
-  @Override
-  protected SeekableByteArrayInputStream newInputStream(byte[] contents) throws IOException {
-    return new SeekableByteArrayInputStream(contents);
-  }
+  /** returns the total length of the stream or file */
+  long length() throws IOException;
 
 }

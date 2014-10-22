@@ -24,6 +24,7 @@ import org.apache.flume.*;
 import org.apache.flume.client.avro.ReliableSpoolingFileEventReader;
 import org.apache.flume.conf.Configurable;
 import org.apache.flume.instrumentation.SourceCounter;
+import org.apache.flume.serialization.DecodeErrorPolicy;
 import org.apache.flume.serialization.LineDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +61,8 @@ Configurable, EventDrivenSource {
   private String deserializerType;
   private Context deserializerContext;
   private String deletePolicy;
+  private String inputCharset;
+  private DecodeErrorPolicy decodeErrorPolicy;
   private volatile boolean hasFatalError = false;
 
   private SourceCounter sourceCounter;
@@ -91,6 +94,8 @@ Configurable, EventDrivenSource {
           .deserializerType(deserializerType)
           .deserializerContext(deserializerContext)
           .deletePolicy(deletePolicy)
+          .inputCharset(inputCharset)
+          .decodeErrorPolicy(decodeErrorPolicy)
           .consumeOrder(consumeOrder)
           .build();
     } catch (IOException ioe) {
@@ -148,6 +153,10 @@ Configurable, EventDrivenSource {
         DEFAULT_BASENAME_HEADER_KEY);
     batchSize = context.getInteger(BATCH_SIZE,
         DEFAULT_BATCH_SIZE);
+    inputCharset = context.getString(INPUT_CHARSET, DEFAULT_INPUT_CHARSET);
+    decodeErrorPolicy = DecodeErrorPolicy.valueOf(
+        context.getString(DECODE_ERROR_POLICY, DEFAULT_DECODE_ERROR_POLICY)
+        .toUpperCase(Locale.ENGLISH));
 
     ignorePattern = context.getString(IGNORE_PAT, DEFAULT_IGNORE_PAT);
     trackerDirPath = context.getString(TRACKER_DIR, DEFAULT_TRACKER_DIR);

@@ -27,8 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Locale;
-import java.io.InputStream;
-import java.util.Locale;
 
 @InterfaceAudience.Private
 @InterfaceStability.Stable
@@ -37,9 +35,8 @@ public class EventDeserializerFactory {
   private static final Logger logger =
       LoggerFactory.getLogger(EventDeserializerFactory.class);
 
-  @SuppressWarnings("unchecked")
   public static EventDeserializer getInstance(
-      String deserializerType, Context context, InputStream in) {
+      String deserializerType, Context context, ResettableInputStream in) {
 
     Preconditions.checkNotNull(deserializerType,
         "serializer type must not be null");
