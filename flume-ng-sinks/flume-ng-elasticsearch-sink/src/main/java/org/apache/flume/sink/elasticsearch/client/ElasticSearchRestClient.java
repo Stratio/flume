@@ -20,6 +20,10 @@ package org.apache.flume.sink.elasticsearch.client;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
+
 import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.EventDeliveryException;
@@ -94,18 +98,17 @@ public class  ElasticSearchRestClient implements ElasticSearchClient {
   @Override
   public void addEvent(Event event, IndexNameBuilder indexNameBuilder, String indexType, long ttlMs) throws Exception {
     BytesReference content = serializer.getContentBuilder(event).bytes();
-    Map<String, Map<String, String>> parameters = new HashMap<String, Map<String, String>>();
-    Map<String, String> indexParameters = new HashMap<String, String>();
-    indexParameters.put(INDEX_PARAM, indexNameBuilder.getIndexName(event));
-    indexParameters.put(TYPE_PARAM, indexType);
+    final Gson gson = new Gson();
+    final JsonObject indexParameters = new JsonObject();
+    indexParameters.addProperty(INDEX_PARAM, indexNameBuilder.getIndexName(event));
+    indexParameters.addProperty(TYPE_PARAM, indexType);
     if (ttlMs > 0) {
-      indexParameters.put(TTL_PARAM, Long.toString(ttlMs));
+      indexParameters.addProperty(TTL_PARAM, Long.toString(ttlMs));
     }
-    parameters.put(INDEX_OPERATION_NAME, indexParameters);
-
-    Gson gson = new Gson();
+    final JsonObject parameters = new JsonObject();
+    parameters.add(INDEX_OPERATION_NAME, indexParameters);
     synchronized(bulkBuilder) {
-      bulkBuilder.append(gson.toJson(parameters));
+      gson.toJson(parameters, bulkBuilder);
       bulkBuilder.append("\n");
       bulkBuilder.append(content.toBytesArray().toUtf8());
       bulkBuilder.append("\n");

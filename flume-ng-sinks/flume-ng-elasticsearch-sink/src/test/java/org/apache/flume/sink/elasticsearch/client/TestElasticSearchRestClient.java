@@ -102,7 +102,7 @@ public class TestElasticSearchRestClient {
     verify(httpClient).execute(argument.capture());
 
     assertEquals("http://host1/_bulk", argument.getValue().getURI().toString());
-    assertEquals("{\"index\":{\"_type\":\"bar_type\",\"_index\":\"foo_index\"}}\n" + MESSAGE_CONTENT + "\n",
+    assertEquals("{\"index\":{\"_index\":\"foo_index\",\"_type\":\"bar_type\"}}\n" + MESSAGE_CONTENT + "\n",
             EntityUtils.toString(argument.getValue().getEntity()));
   }
 
@@ -121,7 +121,7 @@ public class TestElasticSearchRestClient {
     verify(httpClient).execute(argument.capture());
 
     assertEquals("http://host1/_bulk", argument.getValue().getURI().toString());
-    assertEquals("{\"index\":{\"_type\":\"bar_type\",\"_index\":\"foo_index\",\"_ttl\":\"123\"}}\n" +
+    assertEquals("{\"index\":{\"_index\":\"foo_index\",\"_type\":\"bar_type\",\"_ttl\":\"123\"}}\n" +
             MESSAGE_CONTENT + "\n", EntityUtils.toString(argument.getValue().getEntity()));
   }
 
