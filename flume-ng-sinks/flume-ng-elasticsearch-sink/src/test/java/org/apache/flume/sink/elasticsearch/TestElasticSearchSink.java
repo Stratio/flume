@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.TimeZone;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.time.FastDateFormat;
 
@@ -48,9 +49,8 @@ import org.apache.flume.conf.Configurables;
 import org.apache.flume.event.EventBuilder;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.client.Requests;
-import org.elasticsearch.common.UUID;
 import org.elasticsearch.common.io.BytesStream;
-import org.elasticsearch.common.io.FastByteArrayOutputStream;
+import org.elasticsearch.common.io.stream.BytesStreamOutput;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -419,7 +419,7 @@ class FakeEventSerializer implements ElasticSearchEventSerializer {
 
   @Override
   public BytesStream getContentBuilder(Event event) throws IOException {
-    FastByteArrayOutputStream fbaos = new FastByteArrayOutputStream(4);
+    BytesStreamOutput fbaos = new BytesStreamOutput(4);
     fbaos.write(FAKE_BYTES);
     return fbaos;
   }
