@@ -19,8 +19,8 @@
 package org.apache.flume.sink.elasticsearch;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.time.FastDateFormat;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.conf.ComponentConfiguration;
