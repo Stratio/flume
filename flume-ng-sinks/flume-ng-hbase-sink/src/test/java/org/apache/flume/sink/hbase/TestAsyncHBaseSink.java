@@ -52,6 +52,7 @@ import com.google.common.primitives.Longs;
 
 import org.junit.After;
 
+@Ignore("TODO: Move to integration tests")
 public class TestAsyncHBaseSink {
   private static HBaseTestingUtility testUtility = new HBaseTestingUtility();
 
