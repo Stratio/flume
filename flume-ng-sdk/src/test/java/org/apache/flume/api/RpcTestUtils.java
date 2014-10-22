@@ -169,7 +169,7 @@ public class RpcTestUtils {
       server = new NettyServer(responder,
           new InetSocketAddress(localhost, port),
           new NioServerSocketChannelFactory
-          (Executors .newCachedThreadPool(), Executors.newCachedThreadPool()),
+          (Executors .newCachedThreadPool(), Executors.newCachedThreadPool(), 2),
           new CompressionChannelPipelineFactory(), null);
     } else {
       server = new NettyServer(responder,
