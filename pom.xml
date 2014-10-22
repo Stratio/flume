@@ -81,7 +81,7 @@ limitations under the License.
         </property>
       </activation>
       <properties>
-        <hadoop.version>1.0.1</hadoop.version>
+        <hadoop.version>1.2.1</hadoop.version>
         <hbase.version>0.92.1</hbase.version>
         <hadoop.common.artifact.id>hadoop-core</hadoop.common.artifact.id>
         <thrift.version>0.7.0</thrift.version>
