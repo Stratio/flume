@@ -236,7 +236,7 @@ public class TestReliableSpoolingFileEventReader {
       .build();
     File fileName = new File(WORK_DIR, "new-file");
     FileUtils.write(fileName,
-      "New file created in the end. Shoud be read randomly.\n");
+      "New file created in the end. Should be read randomly.\n");
     Set<String> expected = Sets.newHashSet();
     int totalFiles = WORK_DIR.listFiles().length;
     final Set<String> actual = Sets.newHashSet();
@@ -263,7 +263,7 @@ public class TestReliableSpoolingFileEventReader {
     createExpectedFromFilesInSetup(expected);
     expected.add("");
     expected.add(
-      "New file created in the end. Shoud be read randomly.");
+      "New file created in the end. Should be read randomly.");
     expected.add("Last file");
     Assert.assertTrue(listFilesCount < (totalFiles + 2));
     Assert.assertEquals(expected, actual);
