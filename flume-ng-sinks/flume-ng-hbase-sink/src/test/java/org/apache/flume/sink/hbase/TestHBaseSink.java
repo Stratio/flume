@@ -62,6 +62,7 @@ import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Ignore("TODO: Move to integration tests")
 public class TestHBaseSink {
   private static final Logger logger =
       LoggerFactory.getLogger(TestHBaseSink.class);

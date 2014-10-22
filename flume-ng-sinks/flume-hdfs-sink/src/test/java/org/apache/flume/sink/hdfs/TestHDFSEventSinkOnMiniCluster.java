@@ -48,6 +48,7 @@ import org.slf4j.LoggerFactory;
  * Unit tests that exercise HDFSEventSink on an actual instance of HDFS.
  * TODO: figure out how to unit-test Kerberos-secured HDFS.
  */
+@Ignore("TODO: Move to integration tests")
 public class TestHDFSEventSinkOnMiniCluster {
 
   private static final Logger logger =
