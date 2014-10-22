@@ -36,7 +36,7 @@ import java.util.HashMap;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang.time.FastDateFormat;
+import org.apache.commons.lang3.time.FastDateFormat;
 
 import org.apache.flume.Channel;
 import org.apache.flume.Context;
