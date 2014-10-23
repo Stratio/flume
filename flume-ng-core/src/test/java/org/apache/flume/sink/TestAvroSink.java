@@ -21,10 +21,9 @@ package org.apache.flume.sink;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
+import java.net.ServerSocket;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -38,9 +37,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import org.apache.avro.AvroRemoteException;
 import org.apache.avro.ipc.NettyServer;
-import org.apache.avro.ipc.NettyTransceiver;
 import org.apache.avro.ipc.Server;
-import org.apache.avro.ipc.specific.SpecificRequestor;
 import org.apache.avro.ipc.specific.SpecificResponder;
 import org.apache.flume.Channel;
 import org.apache.flume.ChannelSelector;
@@ -61,15 +58,14 @@ import org.apache.flume.source.AvroSource;
 import org.apache.flume.source.avro.AvroFlumeEvent;
 import org.apache.flume.source.avro.AvroSourceProtocol;
 import org.apache.flume.source.avro.Status;
-import org.jboss.netty.channel.ChannelException;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.jboss.netty.handler.ssl.SslHandler;
+import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,11 +75,30 @@ public class TestAvroSink {
   private static final Logger logger = LoggerFactory
       .getLogger(TestAvroSink.class);
   private static final String hostname = "127.0.0.1";
-  private static final Integer port = 41414;
+  private static Integer port = null;
 
   private AvroSink sink;
   private Channel channel;
+  private Server server;
 
+
+  @BeforeClass
+  public static void setUpClass() throws IOException {
+    ServerSocket s = null ;
+    try {
+      s = new ServerSocket( 0 );
+      if (s.isBound()) {
+        port = s.getLocalPort();
+      }
+    } finally {
+      if (s != null && !s.isClosed()) {
+        s.close();
+      }
+    }
+    if (port == null) {
+      throw new IOException("Unable to bind port");
+    }
+  }
 
   public void setUp() {
     setUp("none", 0);
@@ -112,12 +127,19 @@ public class TestAvroSink {
     Configurables.configure(channel, context);
   }
 
+  @After
+  public void tearDown() {
+    if (server != null) {
+      server.close();
+      server = null;
+    }
+  }
+
   @Test
   public void testLifecycle() throws InterruptedException,
       InstantiationException, IllegalAccessException {
     setUp();
-    Server server = createServer(new MockAvroServer());
-
+    server = createServer(new MockAvroServer());
     server.start();
 
     sink.start();
@@ -127,8 +149,6 @@ public class TestAvroSink {
     sink.stop();
     Assert.assertTrue(LifecycleController.waitForOneOf(sink,
         LifecycleState.STOP_OR_ERROR, 5000));
-
-    server.close();
   }
 
   @Test
@@ -137,8 +157,7 @@ public class TestAvroSink {
     setUp();
 
     Event event = EventBuilder.withBody("test event 1", Charsets.UTF_8);
-    Server server = createServer(new MockAvroServer());
-
+    server = createServer(new MockAvroServer());
     server.start();
 
     sink.start();
@@ -164,8 +183,6 @@ public class TestAvroSink {
     sink.stop();
     Assert.assertTrue(LifecycleController.waitForOneOf(sink,
         LifecycleState.STOP_OR_ERROR, 5000));
-
-    server.close();
   }
 
   @Test
@@ -174,7 +191,7 @@ public class TestAvroSink {
     setUp();
     Event event = EventBuilder.withBody("foo", Charsets.UTF_8);
     AtomicLong delay = new AtomicLong();
-    Server server = createServer(new DelayMockAvroServer(delay));
+    server = createServer(new DelayMockAvroServer(delay));
     server.start();
     sink.start();
     Assert.assertTrue(LifecycleController.waitForOneOf(sink,
@@ -221,7 +238,6 @@ public class TestAvroSink {
     sink.stop();
     Assert.assertTrue(LifecycleController.waitForOneOf(sink,
         LifecycleState.STOP_OR_ERROR, 5000));
-    server.close();
   }
 
   @Test
@@ -231,7 +247,7 @@ public class TestAvroSink {
     setUp();
     Event event = EventBuilder.withBody("test event 1",
         Charset.forName("UTF8"));
-    Server server = createServer(new MockAvroServer());
+    server = createServer(new MockAvroServer());
 
     server.start();
     sink.start();
@@ -275,14 +291,12 @@ public class TestAvroSink {
     sink.stop();
     Assert.assertTrue(LifecycleController.waitForOneOf(sink,
         LifecycleState.STOP_OR_ERROR, 5000));
-    server.close();
   }
 
   @Test
   public void testReset() throws Exception {
-
     setUp();
-    Server server = createServer(new MockAvroServer());
+    server = createServer(new MockAvroServer());
 
     server.start();
 
@@ -340,8 +354,7 @@ public class TestAvroSink {
     Thread.sleep(6000);
     // Make sure they are the same object, since connection should not be reset
     Assert.assertTrue(firstClient == sink.getUnderlyingClient());
-    sink.stop();
-    server.close();
+    sink.stop();;
   }
 
   @Test
@@ -349,7 +362,7 @@ public class TestAvroSink {
       EventDeliveryException, InstantiationException, IllegalAccessException {
     setUp();
     Event event = EventBuilder.withBody("test event 1", Charsets.UTF_8);
-    Server server = createSslServer(new MockAvroServer());
+    server = createSslServer(new MockAvroServer());
 
     server.start();
 
@@ -388,8 +401,6 @@ public class TestAvroSink {
     sink.stop();
     Assert.assertTrue(LifecycleController.waitForOneOf(sink,
         LifecycleState.STOP_OR_ERROR, 5000));
-
-    server.close();
   }
 
   @Test
@@ -397,7 +408,7 @@ public class TestAvroSink {
       EventDeliveryException, InstantiationException, IllegalAccessException {
     setUp();
     Event event = EventBuilder.withBody("test event 1", Charsets.UTF_8);
-    Server server = createSslServer(new MockAvroServer());
+    server = createSslServer(new MockAvroServer());
 
     server.start();
 
@@ -437,18 +448,14 @@ public class TestAvroSink {
     sink.stop();
     Assert.assertTrue(LifecycleController.waitForOneOf(sink,
         LifecycleState.STOP_OR_ERROR, 5000));
-
-    server.close();
   }
 
   private Server createServer(AvroSourceProtocol protocol)
       throws IllegalAccessException, InstantiationException {
 
-    Server server = new NettyServer(new SpecificResponder(
+    return new NettyServer(new SpecificResponder(
         AvroSourceProtocol.class, protocol), new InetSocketAddress(
         hostname, port));
-
-    return server;
   }
 
   @Test
@@ -456,11 +463,8 @@ public class TestAvroSink {
       EventDeliveryException, InstantiationException, IllegalAccessException {
     setUp("deflate", 6);
 
-    boolean bound = false;
-
     AvroSource source;
     Channel sourceChannel;
-    int selectedPort;
 
     source = new AvroSource();
     sourceChannel = new MemoryChannel();
@@ -555,7 +559,7 @@ public class TestAvroSink {
       EventDeliveryException, InstantiationException, IllegalAccessException {
     setUp();
     Event event = EventBuilder.withBody("test event 1", Charsets.UTF_8);
-    Server server = createServer(new MockAvroServer());
+    server = createServer(new MockAvroServer());
 
     server.start();
 
@@ -599,8 +603,6 @@ public class TestAvroSink {
     Assert.assertTrue(LifecycleController.waitForOneOf(sink,
         LifecycleState.STOP_OR_ERROR, 5000));
 
-    server.close();
-
     if (failed) {
       Assert.fail("SSL-enabled sink successfully connected to a non-SSL-enabled server, that's wrong.");
     }
@@ -611,7 +613,7 @@ public class TestAvroSink {
       EventDeliveryException, InstantiationException, IllegalAccessException {
     setUp();
     Event event = EventBuilder.withBody("test event 1", Charsets.UTF_8);
-    Server server = createSslServer(new MockAvroServer());
+    server = createSslServer(new MockAvroServer());
 
     server.start();
 
@@ -653,8 +655,6 @@ public class TestAvroSink {
     sink.stop();
     Assert.assertTrue(LifecycleController.waitForOneOf(sink,
         LifecycleState.STOP_OR_ERROR, 5000));
-
-    server.close();
 
     if (failed) {
       Assert.fail("SSL-enabled sink successfully connected to a server with an untrusted certificate when it should have failed");
@@ -699,11 +699,8 @@ public class TestAvroSink {
       setUp("none", compressionLevel);
     }
 
-    boolean bound = false;
-
     AvroSource source;
     Channel sourceChannel;
-    int selectedPort;
 
     source = new AvroSource();
     sourceChannel = new MemoryChannel();
@@ -833,15 +830,13 @@ public class TestAvroSink {
 
   private Server createSslServer(AvroSourceProtocol protocol)
       throws IllegalAccessException, InstantiationException {
-    Server server = new NettyServer(new SpecificResponder(
+    return new NettyServer(new SpecificResponder(
         AvroSourceProtocol.class, protocol), new InetSocketAddress(hostname, port),
             new NioServerSocketChannelFactory(
                     Executors.newCachedThreadPool(),
                     Executors.newCachedThreadPool()),
             new SSLChannelPipelineFactory(),
             null);
-
-    return server;
   }
 
   /**
