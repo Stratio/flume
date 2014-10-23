@@ -31,9 +31,8 @@ limitations under the License.
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <solr.version>4.3.0</solr.version>
-    <solr.expected.version>4.3.0</solr.expected.version> <!-- sanity check to verify we actually run against the expected version rather than some outdated version -->
-    <slf4j.version>1.6.1</slf4j.version>
+    <solr.version>4.10.1</solr.version>
+    <solr.expected.version>4.10.1</solr.expected.version> <!-- sanity check to verify we actually run against the expected version rather than some outdated version -->
     <surefire.version>2.12.4</surefire.version>
   </properties>
 
@@ -89,7 +88,7 @@ limitations under the License.
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>jcl-over-slf4j</artifactId>
-      <version>${slf4j.version}</version> <!-- flume provides 1.7.2 and solr depends on 1.6.4 -->
+      <version>${slf4j.version}</version> <!-- Flume provides 1.7.7 and Solr 4.10.1 depends on 1.7.6 -->
       <scope>provided</scope>
     </dependency>
 
