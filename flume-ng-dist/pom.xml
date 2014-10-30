@@ -68,23 +68,7 @@
       <id>hadoop-2</id>
       <activation>
         <property>
-          <name>hadoop.profile</name>
-          <value>2</value>
-        </property>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>org.apache.flume.flume-ng-sinks</groupId>
-          <artifactId>flume-dataset-sink</artifactId>
-        </dependency>
-      </dependencies>
-    </profile>
-    <profile>
-      <id>hbase-98</id>
-      <activation>
-        <property>
-          <name>hadoop.profile</name>
-          <value>hbase-98</value>
+          <name>!hadoop.profile</name>
         </property>
       </activation>
       <dependencies>
