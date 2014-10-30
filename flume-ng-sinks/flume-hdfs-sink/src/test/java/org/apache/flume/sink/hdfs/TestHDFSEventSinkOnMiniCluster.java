@@ -94,7 +94,7 @@ public class TestHDFSEventSinkOnMiniCluster {
   /**
    * This is a very basic test that writes one event to HDFS and reads it back.
    */
-  @Test
+  @Test(timeout = 60 * 1000)
   public void simpleHDFSTest() throws EventDeliveryException, IOException {
     cluster = new MiniDFSCluster(new Configuration(), 1, true, null);
     cluster.waitActive();
@@ -173,7 +173,7 @@ public class TestHDFSEventSinkOnMiniCluster {
   /**
    * Writes two events in GZIP-compressed serialize.
    */
-  @Test
+  @Test(timeout = 60 * 1000)
   public void simpleHDFSGZipCompressedTest() throws EventDeliveryException, IOException {
     cluster = new MiniDFSCluster(new Configuration(), 1, true, null);
     cluster.waitActive();
@@ -270,7 +270,7 @@ public class TestHDFSEventSinkOnMiniCluster {
   /**
    * This is a very basic test that writes one event to HDFS and reads it back.
    */
-  @Test
+  @Test(timeout = 60 * 1000)
   public void underReplicationTest() throws EventDeliveryException,
       IOException {
     Configuration conf = new Configuration();
@@ -383,7 +383,7 @@ public class TestHDFSEventSinkOnMiniCluster {
    * This is a very basic test that writes one event to HDFS and reads it back.
    */
   @Ignore("This test is flakey and causes tests to fail pretty often.")
-  @Test
+  @Test(timeout = 60 * 1000)
   public void maxUnderReplicationTest() throws EventDeliveryException,
       IOException {
     Configuration conf = new Configuration();
