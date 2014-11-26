@@ -39,7 +39,7 @@ public class EventDeserializerFactory {
 
   @SuppressWarnings("unchecked")
   public static EventDeserializer getInstance(
-      String deserializerType, Context context, InputStream in) {
+      String deserializerType, Context context, InputStream in, PositionTracker positionTracker) {
 
     Preconditions.checkNotNull(deserializerType,
         "serializer type must not be null");
@@ -87,7 +87,7 @@ public class EventDeserializerFactory {
       throw new FlumeException(errMessage, ex);
     }
 
-    return builder.build(context, in);
+    return builder.build(context, in, positionTracker);
   }
 
 }

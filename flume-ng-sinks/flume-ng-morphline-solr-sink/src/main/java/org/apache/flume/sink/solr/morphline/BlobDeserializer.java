@@ -28,6 +28,7 @@ import org.apache.flume.annotations.InterfaceStability;
 import org.apache.flume.conf.ConfigurationException;
 import org.apache.flume.event.EventBuilder;
 import org.apache.flume.serialization.EventDeserializer;
+import org.apache.flume.serialization.PositionTracker;
 import org.apache.flume.serialization.Resettable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,7 +154,7 @@ public class BlobDeserializer implements EventDeserializer {
   public static class Builder implements EventDeserializer.Builder {
 
     @Override
-    public BlobDeserializer build(Context context, InputStream in) {
+    public BlobDeserializer build(Context context, InputStream in, PositionTracker positionTracker) {
       if (!(in instanceof Resettable)) {
         throw new IllegalArgumentException(
             "Cannot use this deserializer without a Resettable input stream");

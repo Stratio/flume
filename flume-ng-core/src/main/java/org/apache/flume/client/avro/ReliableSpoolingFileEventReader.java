@@ -79,6 +79,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
       .getLogger(ReliableSpoolingFileEventReader.class);
 
   static final String metaFileName = ".flumespool-main.meta";
+  static final String deserializerMetaFileName = ".flumespool-deserializer.meta";
 
   private final File spoolDirectory;
   private final String completedSuffix;
@@ -86,6 +87,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
   private final Context deserializerContext;
   private final Pattern ignorePattern;
   private final File metaFile;
+  private final File deserializerMetaFile;
   private final boolean annotateFileName;
   private final boolean annotateBaseName;
   private final String fileNameHeader;
@@ -191,6 +193,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
     }
 
     this.metaFile = new File(trackerDirectory, metaFileName);
+    this.deserializerMetaFile = new File(trackerDirectory, deserializerMetaFileName);
   }
 
   @VisibleForTesting
@@ -477,6 +480,19 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
     }
     return f2;
   }
+
+  private PositionTracker getPositionTracker(final File _metaFile, final String nextPath) throws IOException {
+    PositionTracker tracker =
+        DurablePositionTracker.getInstance(metaFile, nextPath);
+    // roll meta file, if needed
+    if (!tracker.getTarget().equals(nextPath)) {
+      tracker.close();
+      deleteMetaFile();
+      tracker = DurablePositionTracker.getInstance(metaFile, nextPath);
+    }
+    return tracker;
+  }
+
   /**
    * Opens a file for consuming
    * @param file
@@ -485,15 +501,9 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
    */
   private Optional<FileInfo> openFile(File file) {    
     try {
-      // roll the meta file, if needed
       String nextPath = file.getPath();
-      PositionTracker tracker =
-          DurablePositionTracker.getInstance(metaFile, nextPath);
-      if (!tracker.getTarget().equals(nextPath)) {
-        tracker.close();
-        deleteMetaFile();
-        tracker = DurablePositionTracker.getInstance(metaFile, nextPath);
-      }
+      PositionTracker tracker = getPositionTracker(metaFile, nextPath);
+      PositionTracker deserializerTracker = getPositionTracker(deserializerMetaFile, nextPath);
 
       // sanity check
       Preconditions.checkState(tracker.getTarget().equals(nextPath),
@@ -506,7 +516,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
               tracker);
 
       EventDeserializer deserializer = EventDeserializerFactory.getInstance
-          (deserializerType, deserializerContext, in);
+          (deserializerType, deserializerContext, in, deserializerTracker);
 
       return Optional.of(new FileInfo(file, deserializer));
     } catch (FileNotFoundException e) {
@@ -522,6 +532,9 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
   private void deleteMetaFile() throws IOException {
     if (metaFile.exists() && !metaFile.delete()) {
       throw new IOException("Unable to delete old meta file " + metaFile);
+    }
+    if (deserializerMetaFile.exists() && !deserializerMetaFile.delete()) {
+      throw new IOException("Unable to delete old deserializer meta file " + deserializerMetaFile);
     }
   }
 

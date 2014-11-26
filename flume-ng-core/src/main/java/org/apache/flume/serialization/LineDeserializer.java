@@ -149,7 +149,7 @@ public class LineDeserializer implements EventDeserializer {
   public static class Builder implements EventDeserializer.Builder {
 
     @Override
-    public EventDeserializer build(Context context, InputStream in) {
+    public EventDeserializer build(Context context, InputStream in, PositionTracker positionTracker) {
       if (!(in instanceof Seekable)) {
         throw new IllegalArgumentException(
             "Cannot use this deserializer without a Seekable input stream");

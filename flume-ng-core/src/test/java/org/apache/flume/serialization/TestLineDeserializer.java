@@ -51,7 +51,7 @@ public class TestLineDeserializer {
   public void testSimpleViaBuilder() throws IOException {
     SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
     EventDeserializer.Builder builder = new LineDeserializer.Builder();
-    EventDeserializer des = builder.build(new Context(), in);
+    EventDeserializer des = builder.build(new Context(), in, new TransientPositionTracker(""));
     validateMiniParse(des, LineDeserializer.DEFAULT_OUTPUT_CHARSET);
   }
 
@@ -59,21 +59,21 @@ public class TestLineDeserializer {
   public void testViaBuilderWithNotSeekable() throws IOException {
     ByteArrayInputStream in = new ByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
     EventDeserializer.Builder builder = new LineDeserializer.Builder();
-    builder.build(new Context(), in);
+    builder.build(new Context(), in,  new TransientPositionTracker(""));
   }
 
   @Test
   public void testSimpleViaFactory() throws IOException {
     SeekableByteArrayInputStream in = new SeekableByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
     EventDeserializer des;
-    des = EventDeserializerFactory.getInstance("LINE", new Context(), in);
+    des = EventDeserializerFactory.getInstance("LINE", new Context(), in,  new TransientPositionTracker(""));
     validateMiniParse(des, LineDeserializer.DEFAULT_OUTPUT_CHARSET);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testViaFactoryWithNotSeekable() throws IOException {
     ByteArrayInputStream in = new ByteArrayInputStream(mini.getBytes(Charsets.UTF_8));
-    EventDeserializerFactory.getInstance("LINE", new Context(), in);
+    EventDeserializerFactory.getInstance("LINE", new Context(), in,  new TransientPositionTracker(""));
   }
 
   @Test

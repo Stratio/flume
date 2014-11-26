@@ -63,13 +63,15 @@ public class TestAvroEventDeserializer {
     String target = tempFile.getAbsolutePath();
     logger.info("Target: {}", target);
     TransientPositionTracker tracker = new TransientPositionTracker(target);
+    TransientPositionTracker deserializerTracker = new TransientPositionTracker(target);
 
     AvroEventDeserializer.Builder desBuilder =
         new AvroEventDeserializer.Builder();
     EventDeserializer deserializer = desBuilder.build(new Context(),
         new SeekableReliableInputStream(
             new SeekableBufferedFileInputStream(tempFile),
-            tracker));
+            tracker),
+        deserializerTracker);
 
     BinaryDecoder decoder = null;
     DatumReader<GenericRecord> reader =
@@ -107,6 +109,7 @@ public class TestAvroEventDeserializer {
     String target = tempFile.getAbsolutePath();
     logger.info("Target: {}", target);
     TransientPositionTracker tracker = new TransientPositionTracker(target);
+    TransientPositionTracker deserializerTracker = new TransientPositionTracker(target);
 
     Context context = new Context();
     context.put(AvroEventDeserializer.CONFIG_SCHEMA_TYPE_KEY,
@@ -117,7 +120,7 @@ public class TestAvroEventDeserializer {
             new SeekableBufferedFileInputStream(tempFile),
             tracker);
     EventDeserializer des =
-        new AvroEventDeserializer.Builder().build(context, in);
+        new AvroEventDeserializer.Builder().build(context, in, deserializerTracker);
 
     Event event = des.readEvent();
     String eventSchemaHash =
@@ -135,6 +138,7 @@ public class TestAvroEventDeserializer {
     String target = tempFile.getAbsolutePath();
     logger.info("Target: {}", target);
     TransientPositionTracker tracker = new TransientPositionTracker(target);
+    TransientPositionTracker deserializerTracker = new TransientPositionTracker(target);
 
     Context context = new Context();
     context.put(AvroEventDeserializer.CONFIG_SCHEMA_TYPE_KEY,
@@ -145,7 +149,7 @@ public class TestAvroEventDeserializer {
             new SeekableBufferedFileInputStream(tempFile),
             tracker);
     EventDeserializer des =
-        new AvroEventDeserializer.Builder().build(context, in);
+        new AvroEventDeserializer.Builder().build(context, in, deserializerTracker);
 
     Event event = des.readEvent();
     String eventSchema =

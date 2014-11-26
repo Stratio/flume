@@ -90,7 +90,7 @@ public interface EventDeserializer extends Resettable, Closeable {
    */
   public interface Builder {
 
-    public EventDeserializer build(Context context, InputStream in);
+    public EventDeserializer build(Context context, InputStream in, PositionTracker positionTracker);
 
   }
 
