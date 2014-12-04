@@ -65,49 +65,49 @@ public class DurablePositionTracker implements PositionTracker {
    * @return
    * @throws IOException
    */
-  public static DurablePositionTracker getInstance(File trackerFile,
-      String target) throws IOException {
+  public static DurablePositionTracker getInstance(File trackerFile, String target) throws IOException {
 
     if (!trackerFile.exists()) {
       return new DurablePositionTracker(trackerFile, target);
     }
 
-    // exists
-    DurablePositionTracker oldTracker =
-        new DurablePositionTracker(trackerFile, target);
-    String existingTarget = oldTracker.getTarget();
-    long targetPosition = oldTracker.getPosition();
+    // Open old tracker file
+    final DurablePositionTracker oldTracker = new DurablePositionTracker(trackerFile, target);
+    final String oldTarget = oldTracker.getTarget();
+    final long oldTargetPosition = oldTracker.getPosition();
     oldTracker.close();
 
-    File tmpMeta = File.createTempFile(trackerFile.getName(), ".tmp",
-        trackerFile.getParentFile());
-    tmpMeta.delete();
-    DurablePositionTracker tmpTracker =
-        new DurablePositionTracker(tmpMeta, existingTarget);
-    tmpTracker.storePosition(targetPosition);
-    tmpTracker.close();
+    // We are resuming reading for the same target
+    // So we create a new tracker file with the same data
+    // to ensure that we do not get an invalid record from
+    // a previous crash.
+    if (oldTarget.equals(target)) {
+      final File tmpMeta = File.createTempFile(trackerFile.getName(), ".tmp", trackerFile.getParentFile());
+      tmpMeta.delete();
+      final DurablePositionTracker tmpTracker = new DurablePositionTracker(tmpMeta, oldTarget);
+      tmpTracker.storePosition(oldTargetPosition);
+      tmpTracker.close();
 
-    // On windows, things get messy with renames...
-    // FIXME: This is not atomic. Consider implementing a recovery procedure
-    // so that if it does not exist at startup, check for a rolled version
-    // before creating a new file from scratch.
-    if (PlatformDetect.isWindows()) {
-      if (!trackerFile.delete()) {
-        throw new IOException("Unable to delete existing meta file " +
-            trackerFile);
+      // On windows, things get messy with renames...
+      // FIXME: This is not atomic. Consider implementing a recovery procedure
+      // so that if it does not exist at startup, check for a rolled version
+      // before creating a new file from scratch.
+      if (PlatformDetect.isWindows()) {
+        if (!trackerFile.delete()) {
+          throw new IOException("Unable to delete existing meta file " + trackerFile);
+        }
       }
-    }
 
-    // rename tmp file to meta
-    if (!tmpMeta.renameTo(trackerFile)) {
-      throw new IOException("Unable to rename " + tmpMeta + " to " +
-          trackerFile);
+      // rename tmp file to meta
+      if (!tmpMeta.renameTo(trackerFile)) {
+        throw new IOException("Unable to rename " + tmpMeta + " to " + trackerFile);
+      }
+    } else {
+      trackerFile.delete();
     }
 
     // return a new known-good version that is open for append
-    DurablePositionTracker newTracker =
-        new DurablePositionTracker(trackerFile, existingTarget);
-    return newTracker;
+    return new DurablePositionTracker(trackerFile, target);
   }
 
 
@@ -127,12 +127,10 @@ public class DurablePositionTracker implements PositionTracker {
     this.target = target;
 
     DatumWriter<TransferStateFileMeta> dout =
-        new SpecificDatumWriter<TransferStateFileMeta>(
-            TransferStateFileMeta.SCHEMA$);
+        new SpecificDatumWriter<TransferStateFileMeta>(TransferStateFileMeta.SCHEMA$);
 
     DatumReader<TransferStateFileMeta> din =
-        new SpecificDatumReader<TransferStateFileMeta>(
-            TransferStateFileMeta.SCHEMA$);
+        new SpecificDatumReader<TransferStateFileMeta>(TransferStateFileMeta.SCHEMA$);
 
     writer = new DataFileWriter<TransferStateFileMeta>(dout);
 
@@ -149,8 +147,6 @@ public class DurablePositionTracker implements PositionTracker {
       writer.create(TransferStateFileMeta.SCHEMA$, trackerFile);
       reader = new DataFileReader<TransferStateFileMeta>(trackerFile, din);
     }
-
-    target = getTarget();
 
     // initialize @ line = 0;
     metaCache = TransferStateFileMeta.newBuilder().setOffset(0L).build();
@@ -196,6 +192,14 @@ public class DurablePositionTracker implements PositionTracker {
       writer.close();
       reader.close();
       isOpen = false;
+    }
+  }
+
+  @Override
+  public void delete() throws IOException {
+    close();
+    if (trackerFile.exists()) {
+      trackerFile.delete();
     }
   }
 

@@ -33,4 +33,5 @@ public interface PositionTracker extends Closeable {
   long getPosition();
   String getTarget();
   void close() throws IOException;
+  void delete() throws IOException;
 }

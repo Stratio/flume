@@ -24,9 +24,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.filefilter.IOFileFilter;
-import org.apache.commons.lang.StringUtils;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.FlumeException;
@@ -46,7 +43,6 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.ArrayList;
 
 /**
  * <p/>A {@link ReliableEventReader} which reads log data from files stored
@@ -199,8 +195,8 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
     }
 
     this.metaFile = new File(trackerDirectory, metaFileName);
-    if(metaFile.exists() && metaFile.length() == 0) {
-      deleteMetaFile();
+    if (this.metaFile.exists() && this.metaFile.length() == 0) {
+      this.metaFile.delete();
     }
   }
 
@@ -310,7 +306,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
   private void retireCurrentFile() throws IOException {
     Preconditions.checkState(currentFile.isPresent());
 
-    File fileToRoll = new File(currentFile.get().getFile().getAbsolutePath());
+    final File fileToRoll = new File(currentFile.get().getFile().getAbsolutePath());
 
     currentFile.get().getDeserializer().close();
 
@@ -325,23 +321,21 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
     }
 
     if (deletePolicy.equalsIgnoreCase(DeletePolicy.NEVER.name())) {
-      rollCurrentFile(fileToRoll);
+      rollCurrentFile();
     } else if (deletePolicy.equalsIgnoreCase(DeletePolicy.IMMEDIATE.name())) {
-      deleteCurrentFile(fileToRoll);
+      deleteCurrentFile();
     } else {
       // TODO: implement delay in the future
-      throw new IllegalArgumentException("Unsupported delete policy: " +
-          deletePolicy);
+      throw new IllegalArgumentException("Unsupported delete policy: " + deletePolicy);
     }
   }
 
   /**
-   * Rename the given spooled file
-   * @param fileToRoll
+   * Rename the current file
    * @throws IOException
    */
-  private void rollCurrentFile(File fileToRoll) throws IOException {
-
+  private void rollCurrentFile() throws IOException {
+    final File fileToRoll = new File(currentFile.get().getFile().getAbsolutePath());
     File dest = new File(fileToRoll.getPath() + completedSuffix);
     logger.info("Preparing to move file {} to {}", fileToRoll, dest);
 
@@ -382,7 +376,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
         logger.debug("Successfully rolled file {} to {}", fileToRoll, dest);
 
         // now we no longer need the meta file
-        deleteMetaFile();
+        currentFile.get().getPositionTracker().delete();
       } else {
         /* If we are here then the file cannot be renamed for a reason other
          * than that the destination file exists (actually, that remains
@@ -396,11 +390,11 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
   }
 
   /**
-   * Delete the given spooled file
-   * @param fileToDelete
+   * Delete the current spooled file
    * @throws IOException
    */
-  private void deleteCurrentFile(File fileToDelete) throws IOException {
+  private void deleteCurrentFile() throws IOException {
+    final File fileToDelete = new File(currentFile.get().getFile().getAbsolutePath());
     logger.info("Preparing to delete file {}", fileToDelete);
     if (!fileToDelete.exists()) {
       logger.warn("Unable to delete nonexistent file: {}", fileToDelete);
@@ -410,7 +404,7 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
       throw new IOException("Unable to delete spool file: " + fileToDelete);
     }
     // now we no longer need the meta file
-    deleteMetaFile();
+    currentFile.get().getPositionTracker().delete();
   }
 
   /**
@@ -498,27 +492,21 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
     try {
       // roll the meta file, if needed
       String nextPath = file.getPath();
-      PositionTracker tracker =
-          DurablePositionTracker.getInstance(metaFile, nextPath);
-      if (!tracker.getTarget().equals(nextPath)) {
-        tracker.close();
-        deleteMetaFile();
-        tracker = DurablePositionTracker.getInstance(metaFile, nextPath);
-      }
+      final PositionTracker positionTracker = DurablePositionTracker.getInstance(metaFile, nextPath);
 
       // sanity check
-      Preconditions.checkState(tracker.getTarget().equals(nextPath),
+      Preconditions.checkState(positionTracker.getTarget().equals(nextPath),
           "Tracker target %s does not equal expected filename %s",
-          tracker.getTarget(), nextPath);
+          positionTracker.getTarget(), nextPath);
 
       ResettableInputStream in =
-          new ResettableFileInputStream(file, tracker,
+          new ResettableFileInputStream(file, positionTracker,
               ResettableFileInputStream.DEFAULT_BUF_SIZE, inputCharset,
               decodeErrorPolicy);
       EventDeserializer deserializer = EventDeserializerFactory.getInstance
           (deserializerType, deserializerContext, in);
 
-      return Optional.of(new FileInfo(file, deserializer));
+      return Optional.of(new FileInfo(file, positionTracker, deserializer));
     } catch (FileNotFoundException e) {
       // File could have been deleted in the interim
       logger.warn("Could not find file: " + file, e);
@@ -529,28 +517,25 @@ public class ReliableSpoolingFileEventReader implements ReliableEventReader {
     }
   }
 
-  private void deleteMetaFile() throws IOException {
-    if (metaFile.exists() && !metaFile.delete()) {
-      throw new IOException("Unable to delete old meta file " + metaFile);
-    }
-  }
-
   /** An immutable class with information about a file being processed. */
   private static class FileInfo {
     private final File file;
     private final long length;
     private final long lastModified;
+    private final PositionTracker positionTracker;
     private final EventDeserializer deserializer;
 
-    public FileInfo(File file, EventDeserializer deserializer) {
+    public FileInfo(final File file, final PositionTracker positionTracker, final EventDeserializer deserializer) {
       this.file = file;
       this.length = file.length();
       this.lastModified = file.lastModified();
+      this.positionTracker = positionTracker;
       this.deserializer = deserializer;
     }
 
     public long getLength() { return length; }
     public long getLastModified() { return lastModified; }
+    public PositionTracker getPositionTracker() { return positionTracker; }
     public EventDeserializer getDeserializer() { return deserializer; }
     public File getFile() { return file; }
   }
