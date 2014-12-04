@@ -104,7 +104,7 @@ limitations under the License.
     <maven.site.plugin.version>3.4</maven.site.plugin.version>
     <maven.surefire.plugin.version>2.18</maven.surefire.plugin.version>
     <paranamer.maven.plugin.version>2.7</paranamer.maven.plugin.version>
-    <sphinx.maven.plugin.version>1.0.2</sphinx.maven.plugin.version>
+    <sphinx.maven.plugin.version>1.0.3</sphinx.maven.plugin.version>
 
   </properties>
 
