@@ -26,7 +26,6 @@ limitations under the License.
     <version>1.6.0-SNAPSHOT</version>
   </parent>
 
-  <groupId>org.apache.flume</groupId>
   <artifactId>flume-ng-sources</artifactId>
   <name>Flume Sources</name>
   <packaging>pom</packaging>

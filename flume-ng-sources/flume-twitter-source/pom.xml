@@ -37,25 +37,26 @@ limitations under the License.
     </dependency>
 
     <dependency>
+      <groupId>org.twitter4j</groupId>
+      <artifactId>twitter4j-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.twitter4j</groupId>
+      <artifactId>twitter4j-media-support</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.twitter4j</groupId>
+      <artifactId>twitter4j-stream</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
 
-    <dependency>
-      <groupId>org.twitter4j</groupId>
-      <artifactId>twitter4j-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.twitter4j</groupId>
-      <artifactId>twitter4j-media-support</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.twitter4j</groupId>
-      <artifactId>twitter4j-stream</artifactId>
-    </dependency>
   </dependencies>
 
-  <build>
-  </build>
 </project>

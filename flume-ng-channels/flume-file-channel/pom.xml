@@ -77,6 +77,22 @@
       <artifactId>jsr305</artifactId>
     </dependency>
 
+      <dependency>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java</artifactId>
+          <scope>compile</scope>
+      </dependency>
+
+      <dependency>
+          <groupId>org.mapdb</groupId>
+          <artifactId>mapdb</artifactId>
+      </dependency>
+
+      <dependency>
+          <groupId>org.xerial.snappy</groupId>
+          <artifactId>snappy-java</artifactId>
+      </dependency>
+
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -101,22 +117,6 @@
       <scope>test</scope>
     </dependency>
 
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-      <scope>compile</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.mapdb</groupId>
-      <artifactId>mapdb</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.xerial.snappy</groupId>
-      <artifactId>snappy-java</artifactId>
-    </dependency>
-
   </dependencies>
 
   <profiles>
@@ -126,7 +126,6 @@
      <build>
       <plugins>
         <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-antrun-plugin</artifactId>
           <configuration>
             <skipTests>false</skipTests>
