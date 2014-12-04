@@ -28,9 +28,14 @@ import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.specific.SpecificDatumReader;
 import org.apache.avro.specific.SpecificDatumWriter;
+import org.apache.flume.Context;
+import org.apache.flume.FlumeException;
 import org.apache.flume.annotations.InterfaceAudience;
 import org.apache.flume.annotations.InterfaceStability;
+import org.apache.flume.conf.ConfigurationException;
 import org.apache.flume.tools.PlatformDetect;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <p/>Class that stores object state in an avro container file.
@@ -46,9 +51,11 @@ import org.apache.flume.tools.PlatformDetect;
 @InterfaceStability.Evolving
 public class DurablePositionTracker implements PositionTracker {
 
+  private static final String CONF_TRACKER_DIR = "trackerDir";
+
   private final File trackerFile;
-  private final DataFileWriter<TransferStateFileMeta> writer;
-  private final DataFileReader<TransferStateFileMeta> reader;
+  private DataFileWriter<TransferStateFileMeta> writer;
+  private DataFileReader<TransferStateFileMeta> reader;
   private final TransferStateFileMeta metaCache;
 
   private String target;
@@ -126,31 +133,21 @@ public class DurablePositionTracker implements PositionTracker {
     this.trackerFile = trackerFile;
     this.target = target;
 
-    DatumWriter<TransferStateFileMeta> dout =
-        new SpecificDatumWriter<TransferStateFileMeta>(
-            TransferStateFileMeta.SCHEMA$);
-
-    DatumReader<TransferStateFileMeta> din =
-        new SpecificDatumReader<TransferStateFileMeta>(
-            TransferStateFileMeta.SCHEMA$);
-
-    writer = new DataFileWriter<TransferStateFileMeta>(dout);
-
     if (trackerFile.exists()) {
-      // open it for append
-      writer.appendTo(trackerFile);
+      openTrackerFile();
+      final String actualTarget = reader.getMetaString("file");
 
-      reader = new DataFileReader<TransferStateFileMeta>(trackerFile, din);
-      this.target = reader.getMetaString("file");
+      // roll meta file, if needed
+      if (!actualTarget.equals(target)) {
+        reader.close();
+        writer.close();
+        deleteTrackerFile();
+        openTrackerFile();
+      }
+
     } else {
-      // create the file
-      this.target = target;
-      writer.setMeta("file", target);
-      writer.create(TransferStateFileMeta.SCHEMA$, trackerFile);
-      reader = new DataFileReader<TransferStateFileMeta>(trackerFile, din);
+      createTrackerFile();
     }
-
-    target = getTarget();
 
     // initialize @ line = 0;
     metaCache = TransferStateFileMeta.newBuilder().setOffset(0L).build();
@@ -158,6 +155,29 @@ public class DurablePositionTracker implements PositionTracker {
     initReader();
 
     isOpen = true;
+  }
+
+  private void createTrackerFile() throws IOException {
+    final DatumWriter<TransferStateFileMeta> dout = new SpecificDatumWriter<TransferStateFileMeta>(TransferStateFileMeta.SCHEMA$);
+    final DatumReader<TransferStateFileMeta> din = new SpecificDatumReader<TransferStateFileMeta>(TransferStateFileMeta.SCHEMA$);
+    writer = new DataFileWriter<TransferStateFileMeta>(dout);
+    writer.setMeta("file", target);
+    writer.create(TransferStateFileMeta.SCHEMA$, trackerFile);
+    reader = new DataFileReader<TransferStateFileMeta>(trackerFile, din);
+  }
+
+  private void openTrackerFile() throws IOException {
+    final DatumWriter<TransferStateFileMeta> dout = new SpecificDatumWriter<TransferStateFileMeta>(TransferStateFileMeta.SCHEMA$);
+    final DatumReader<TransferStateFileMeta> din = new SpecificDatumReader<TransferStateFileMeta>(TransferStateFileMeta.SCHEMA$);
+    writer = new DataFileWriter<TransferStateFileMeta>(dout);
+    writer.appendTo(trackerFile);
+    reader = new DataFileReader<TransferStateFileMeta>(trackerFile, din);
+  }
+
+  private void deleteTrackerFile() throws IOException {
+    if (trackerFile.exists() && !trackerFile.delete()) {
+      throw new IOException("Unable to delete old meta file " + trackerFile);
+    }
   }
 
   /**
@@ -197,6 +217,43 @@ public class DurablePositionTracker implements PositionTracker {
       reader.close();
       isOpen = false;
     }
+  }
+
+  public static class Builder implements PositionTracker.Builder {
+
+    private static final Logger log = LoggerFactory.getLogger(Builder.class);
+
+    private final File trackerDir;
+
+    public Builder(final Context context) {
+      if (!context.containsKey(CONF_TRACKER_DIR)) {
+        throw new ConfigurationException("trackerDir property is mandatory");
+      }
+      this.trackerDir = new File(context.getString(CONF_TRACKER_DIR));
+      initializeTrackerDir();
+    }
+
+    private void initializeTrackerDir() {
+      log.debug("Initializing PositionTrackerFactory with tracker directory {}", trackerDir);
+      final boolean wasCreated = trackerDir.mkdirs();
+      if (!wasCreated) {
+        log.debug("Tracker directory created: {}", trackerDir);
+      } else {
+        log.debug("Tracker directory already exists: {}", trackerDir);
+      }
+      if (!trackerDir.isDirectory()) {
+        throw new ConfigurationException("Tracker directory path is not a directory: " + trackerDir);
+      }
+      if (!trackerDir.canWrite()) {
+        throw new ConfigurationException("Tracker directory is not writeable: " + trackerDir);
+      }
+    }
+
+    @Override
+    public PositionTracker build(final String id, final String target) throws IOException {
+      return DurablePositionTracker.getInstance(new File(trackerDir, id + ".meta"), target);
+    }
+
   }
 
 }
