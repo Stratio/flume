@@ -47,6 +47,7 @@ limitations under the License.
     <staging.directory>${project.basedir}/target/docs</staging.directory>
 
     <scala.binary.version>2.10</scala.binary.version>
+    <scala.version>2.10.4</scala.version>
 
     <!-- Dependencies versions -->
     <activemq.core.version>5.7.0</activemq.core.version>
@@ -1014,6 +1015,12 @@ limitations under the License.
         <version>${kafka.version}</version>
         <classifier>test</classifier>
         <scope>test</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-library</artifactId>
+        <version>${scala.version}</version>
       </dependency>
 
       <dependency>
