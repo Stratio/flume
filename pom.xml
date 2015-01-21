@@ -73,7 +73,7 @@ limitations under the License.
     <httpclient.version>4.2.1</httpclient.version>
     <irclib.version>1.10</irclib.version>
     <jackson.version>1.9.3</jackson.version>
-    <jersey.core.version>1.8</jersey.core.version>
+    <jersey.core.version>1.18.3</jersey.core.version>
     <jetty.version>6.1.26</jetty.version>
     <jms.version>1.1</jms.version>
     <joda.time.version>2.1</joda.time.version>
