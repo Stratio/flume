@@ -2257,6 +2257,39 @@ argument.
     a1.sinks.k1.batchSize = 20
     a1.sinks.k1.channel = c1
 
+Cassandra Sink
+~~~~~~~~~~~~~~
+This is a Flume Sink implementation that can publish data to one or more `Cassandra <http://cassandra.apache.org/>`_ tables. Events are mapped to rows automatically based on the table schema. An event header will be mapped to a column with the same name or it will be ignored if there is no matching column.
+
+Required properties are marked in bold font.
+
+===============================  ===================  =============================================================================================
+Property Name                    Default              Description
+===============================  ===================  =============================================================================================
+**type**                         --                   Must be set to ``org.apache.flume.sink.cassandra.CassandraSink``
+**tables**                       --                   A comma-separated list of tables where each event will be inserted. Table names must be fully qualified with keyspace (e.g. mykeyspace1.table1,mykeyspace2.table2).
+hosts                            localhost:9042       A comma-separated list of addresses of Cassandra cluster nodes. It is recommended to set at least two nodes here.
+username			 --                   Username, if using authentication.
+password                         --                   Password, if using authentication.
+cqlFile                          --                   Path to a file with CQL statements that will be executed everytime the sink is started. This is useful to create keyspaces and tables. Remember to always use ``IF NOT EXISTS`` for ``CREATE`` statements.
+bodyColumn                       --                   If this is set, the event body will be mapped to this column name.
+batchSize                        100                  How many messages to process in one batch. Larger batches improve throughput while adding latency.
+consistencyLevel                 QUORUM	              Consistency level for writes. This can be any `consistency level supported by Cassandra <http://www.datastax.com/documentation/cassandra/2.0/cassandra/dml/dml_config_consistency_c.html>`_.
+
+===============================  ===================  =============================================================================================
+
+An example configuration of a Cassandra sink is given below.
+
+.. code-block:: properties
+
+    a1.sinks.k1.type = org.apache.flume.sink.CassandraSink
+    a1.sinks.k1.tables = flume.events_table
+    a1.sinks.k1.hosts = node1:9042,node2:9042
+    a1.sinks.k1.consistencyLevel = EACH_QUORUM
+    a1.sinks.k1.cqlFile = conf/init.cql
+    a1.sinks.k1.batchSize = 20
+    a1.sinks.k1.channel = c1
+
 Custom Sink
 ~~~~~~~~~~~
 

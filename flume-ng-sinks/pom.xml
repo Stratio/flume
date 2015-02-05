@@ -41,6 +41,7 @@ limitations under the License.
   </build>
 
   <modules>
+    <module>flume-cassandra-sink</module>
     <module>flume-hdfs-sink</module>
     <module>flume-irc-sink</module>
     <module>flume-ng-hbase-sink</module>
