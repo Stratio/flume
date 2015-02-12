@@ -19,11 +19,10 @@
 
 package org.apache.flume.lifecycle;
 
-import org.apache.flume.CounterGroup;
 import org.apache.flume.lifecycle.LifecycleSupervisor.SupervisorPolicy;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import static org.mockito.Mockito.*;
 
 public class TestLifecycleSupervisor {
 
@@ -40,6 +39,7 @@ public class TestLifecycleSupervisor {
     supervisor.stop();
   }
 
+  //TODO: What is actually being tested here?
   @Test
   public void testSupervise() throws LifecycleException, InterruptedException {
     supervisor.start();
@@ -51,19 +51,19 @@ public class TestLifecycleSupervisor {
      * LifecycleState.START);
      */
 
-    CountingLifecycleAware node = new CountingLifecycleAware();
+    final MockLifecycleAware node1 = spy(new MockLifecycleAware());
 
     SupervisorPolicy policy = new SupervisorPolicy.OnceOnlyPolicy();
-    supervisor.supervise(node, policy, LifecycleState.START);
+    supervisor.supervise(node1, policy, LifecycleState.START);
 
-    Thread.sleep(10000);
+    verify(node1, timeout(10000)).start();
 
-    node = new CountingLifecycleAware();
+    final MockLifecycleAware node2 = new MockLifecycleAware();
 
     policy = new SupervisorPolicy.OnceOnlyPolicy();
-    supervisor.supervise(node, policy, LifecycleState.START);
+    supervisor.supervise(node2, policy, LifecycleState.START);
 
-    Thread.sleep(5000);
+    verify(node2, timeout(5000)).start();
 
     supervisor.stop();
   }
@@ -75,7 +75,7 @@ public class TestLifecycleSupervisor {
     supervisor.start();
 
     /* Attempt to supervise a known-to-fail config. */
-    LifecycleAware node = new LifecycleAware() {
+    LifecycleAware node = spy(new LifecycleAware() {
 
       @Override
       public void stop() {
@@ -90,14 +90,19 @@ public class TestLifecycleSupervisor {
       public LifecycleState getLifecycleState() {
         return LifecycleState.IDLE;
       }
-    };
+    });
 
     SupervisorPolicy policy = new SupervisorPolicy.OnceOnlyPolicy();
     supervisor.supervise(node, policy, LifecycleState.START);
 
-    Thread.sleep(5000);
+    verify(node, timeout(5000)).start();
+    verify(node, timeout(5000).atLeast(1)).getLifecycleState();
 
     supervisor.stop();
+
+    verify(node, timeout(5000).atLeast(2)).getLifecycleState();
+    verify(node, never()).stop();
+    verifyNoMoreInteractions(node);
   }
 
   @Test
@@ -106,9 +111,9 @@ public class TestLifecycleSupervisor {
 
     supervisor.start();
 
-    LifecycleSupervisor supervisor2 = new LifecycleSupervisor();
+    LifecycleSupervisor supervisor2 = spy(new LifecycleSupervisor());
 
-    CountingLifecycleAware node = new CountingLifecycleAware();
+    MockLifecycleAware node = spy(new MockLifecycleAware());
 
     SupervisorPolicy policy = new SupervisorPolicy.OnceOnlyPolicy();
     supervisor2.supervise(node, policy, LifecycleState.START);
@@ -116,9 +121,15 @@ public class TestLifecycleSupervisor {
     supervisor.supervise(supervisor2,
         new SupervisorPolicy.AlwaysRestartPolicy(), LifecycleState.START);
 
-    Thread.sleep(10000);
+    verify(supervisor2, timeout(10000).times(1)).start();
+    verify(node, timeout(10000).times(1)).start();
 
     supervisor.stop();
+
+    verify(supervisor2, timeout(10000).times(1)).stop();
+    verify(node, timeout(10000).times(1)).stop();
+    verify(supervisor2, atLeast(1)).getLifecycleState();
+    verify(node, atLeast(1)).getLifecycleState();
   }
 
   @Test
@@ -127,7 +138,7 @@ public class TestLifecycleSupervisor {
 
     supervisor.start();
 
-    LifecycleAware service = new CountingLifecycleAware();
+    LifecycleAware service = new MockLifecycleAware();
     SupervisorPolicy policy = new SupervisorPolicy.OnceOnlyPolicy();
 
     supervisor.supervise(service, policy, LifecycleState.START);
@@ -142,52 +153,36 @@ public class TestLifecycleSupervisor {
   public void testStopServce() throws LifecycleException, InterruptedException {
     supervisor.start();
 
-    CountingLifecycleAware service = new CountingLifecycleAware();
+    MockLifecycleAware service = spy(new MockLifecycleAware());
     SupervisorPolicy policy = new SupervisorPolicy.OnceOnlyPolicy();
-
-    Assert.assertEquals(Long.valueOf(0), service.counterGroup.get("start"));
-    Assert.assertEquals(Long.valueOf(0), service.counterGroup.get("stop"));
-
     supervisor.supervise(service, policy, LifecycleState.START);
 
-    Thread.sleep(3200);
-
-    Assert.assertEquals(Long.valueOf(1), service.counterGroup.get("start"));
-    Assert.assertEquals(Long.valueOf(0), service.counterGroup.get("stop"));
+    verify(service, timeout(3200).times(1)).start();
+    verify(service, never()).stop();
 
     supervisor.setDesiredState(service, LifecycleState.STOP);
 
-    Thread.sleep(3200);
-
-    Assert.assertEquals(Long.valueOf(1), service.counterGroup.get("start"));
-    Assert.assertEquals(Long.valueOf(1), service.counterGroup.get("stop"));
+    verify(service, timeout(3200).times(1)).stop();
+    verify(service, times(1)).start();
 
     supervisor.stop();
   }
 
-  public static class CountingLifecycleAware implements LifecycleAware {
+  public static class MockLifecycleAware implements LifecycleAware {
 
-    public CounterGroup counterGroup;
     private LifecycleState lifecycleState;
 
-    public CountingLifecycleAware() {
+    public MockLifecycleAware() {
       lifecycleState = LifecycleState.IDLE;
-      counterGroup = new CounterGroup();
     }
 
     @Override
     public void start() {
-
-      counterGroup.incrementAndGet("start");
-
       lifecycleState = LifecycleState.START;
     }
 
     @Override
     public void stop() {
-
-      counterGroup.incrementAndGet("stop");
-
       lifecycleState = LifecycleState.STOP;
     }
 
