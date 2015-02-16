@@ -18,6 +18,10 @@
  */
 package org.apache.flume.channel;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.withSettings;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,8 +32,10 @@ import junit.framework.Assert;
 import org.apache.flume.Channel;
 import org.apache.flume.ChannelSelector;
 import org.apache.flume.Event;
+import org.apache.flume.event.SimpleEvent;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.internal.stubbing.answers.ThrowsException;
 
 public class TestMultiplexingChannelSelector {
 
@@ -38,12 +44,19 @@ public class TestMultiplexingChannelSelector {
   private ChannelSelector selector;
   private Map<String, String> config = new HashMap<String, String>();
 
+  private Channel createMockChannel(final String name) {
+    final Channel channel = mock(Channel.class, withSettings()
+        .stubOnly().defaultAnswer(new ThrowsException(new UnsupportedOperationException())));
+    doReturn(name).when(channel).getName();
+    return channel;
+  }
+
   @Before
   public void setUp() throws Exception {
     channels.clear();
-    channels.add(MockChannel.createMockChannel("ch1"));
-    channels.add(MockChannel.createMockChannel("ch2"));
-    channels.add(MockChannel.createMockChannel("ch3"));
+    channels.add(createMockChannel("ch1"));
+    channels.add(createMockChannel("ch2"));
+    channels.add(createMockChannel("ch3"));
     config.put("type", "multiplexing");
     config.put("header", "myheader");
 
@@ -64,7 +77,7 @@ public class TestMultiplexingChannelSelector {
     selector = ChannelSelectorFactory.create(channels, config);
     Assert.assertTrue(selector instanceof MultiplexingChannelSelector);
 
-    Event event1 = new MockEvent();
+    Event event1 = new SimpleEvent();
     Map<String, String> header1 = new HashMap<String, String>();
     header1.put("myheader", "foo");// should match ch1 ch2
     event1.setHeaders(header1);
@@ -80,7 +93,7 @@ public class TestMultiplexingChannelSelector {
 
 
 
-    Event event2 = new MockEvent();
+    Event event2 = new SimpleEvent();
     Map<String, String> header2 = new HashMap<String, String>();
     header2.put("myheader", "bar"); // should match ch2 ch3
     event2.setHeaders(header2);
@@ -92,7 +105,7 @@ public class TestMultiplexingChannelSelector {
     List<Channel> optCh2 = selector.getOptionalChannels(event2);
     Assert.assertTrue(optCh2.isEmpty());
 
-    Event event3 = new MockEvent();
+    Event event3 = new SimpleEvent();
     Map<String, String> header3 = new HashMap<String, String>();
     header3.put("myheader", "xyz"); // should match ch1 ch2 ch3
     event3.setHeaders(header3);
@@ -119,7 +132,7 @@ public class TestMultiplexingChannelSelector {
     config.put("default", "ch1 ch3");
     selector = ChannelSelectorFactory.create(channels, config);
     Assert.assertTrue(selector instanceof MultiplexingChannelSelector);
-    Event noHeaderEvent = new MockEvent();
+    Event noHeaderEvent = new SimpleEvent();
 
     List<Channel> reqCh1 = selector.getRequiredChannels(noHeaderEvent);
     List<Channel> optCh1 = selector.getOptionalChannels(noHeaderEvent);
@@ -130,7 +143,7 @@ public class TestMultiplexingChannelSelector {
 
     Map<String, String> header2 = new HashMap<String, String>();
     header2.put("someheader", "foo");
-    Event invalidHeaderEvent = new MockEvent();
+    Event invalidHeaderEvent = new SimpleEvent();
     invalidHeaderEvent.setHeaders(header2);
 
     List<Channel> reqCh2 = selector.getRequiredChannels(invalidHeaderEvent);
@@ -142,7 +155,7 @@ public class TestMultiplexingChannelSelector {
 
     Map<String, String> header3 = new HashMap<String, String>();
     header3.put("myheader", "bar1");
-    Event unmatchedHeaderEvent = new MockEvent();
+    Event unmatchedHeaderEvent = new SimpleEvent();
     unmatchedHeaderEvent.setHeaders(header3);
 
     List<Channel> reqCh3 = selector.getRequiredChannels(unmatchedHeaderEvent);
@@ -154,7 +167,7 @@ public class TestMultiplexingChannelSelector {
 
     Map<String, String> header4 = new HashMap<String, String>();
     header4.put("myheader", "zebra");
-    Event zebraEvent = new MockEvent();
+    Event zebraEvent = new SimpleEvent();
     zebraEvent.setHeaders(header4);
 
     List<Channel> reqCh4 = selector.getRequiredChannels(zebraEvent);
@@ -184,7 +197,7 @@ public class TestMultiplexingChannelSelector {
     selector = ChannelSelectorFactory.create(channels, config);
     Assert.assertTrue(selector instanceof MultiplexingChannelSelector);
 
-    Event event1 = new MockEvent();
+    Event event1 = new SimpleEvent();
     Map<String, String> header1 = new HashMap<String, String>();
     header1.put("myheader", "foo");// should match ch1 ch2
     event1.setHeaders(header1);
@@ -200,7 +213,7 @@ public class TestMultiplexingChannelSelector {
 
 
 
-    Event event2 = new MockEvent();
+    Event event2 = new SimpleEvent();
     Map<String, String> header2 = new HashMap<String, String>();
     header2.put("myheader", "bar"); // should match ch2 ch3
     event2.setHeaders(header2);
@@ -212,7 +225,7 @@ public class TestMultiplexingChannelSelector {
     List<Channel> optCh2 = selector.getOptionalChannels(event2);
     Assert.assertTrue(optCh2.isEmpty());
 
-    Event event3 = new MockEvent();
+    Event event3 = new SimpleEvent();
     Map<String, String> header3 = new HashMap<String, String>();
     header3.put("myheader", "xyz"); // should match ch1 ch2 ch3
     event3.setHeaders(header3);
@@ -226,7 +239,7 @@ public class TestMultiplexingChannelSelector {
     //All of the optional channels should go away.
     Assert.assertTrue(optCh3.isEmpty());
 
-    Event event4 = new MockEvent();
+    Event event4 = new SimpleEvent();
     Map<String, String> header4 = new HashMap<String, String>();
     header4.put("myheader", "zebra");
     event4.setHeaders(header4);
@@ -249,7 +262,7 @@ public class TestMultiplexingChannelSelector {
     selector = ChannelSelectorFactory.create(channels, config);
     Assert.assertTrue(selector instanceof MultiplexingChannelSelector);
 
-    Event event1 = new MockEvent();
+    Event event1 = new SimpleEvent();
     Map<String, String> header1 = new HashMap<String, String>();
     header1.put("myheader", "foo");// should match ch1 ch2
     event1.setHeaders(header1);
@@ -263,7 +276,7 @@ public class TestMultiplexingChannelSelector {
     Assert.assertEquals("ch1", optCh1.get(0).getName());
     Assert.assertEquals("ch2", optCh1.get(1).getName());
 
-    Event event4 = new MockEvent();
+    Event event4 = new SimpleEvent();
     Map<String, String> header4 = new HashMap<String, String>();
     header4.put("myheader", "zebra");
     event4.setHeaders(header4);
@@ -286,7 +299,7 @@ public class TestMultiplexingChannelSelector {
     selector = ChannelSelectorFactory.create(channels, config);
     Assert.assertTrue(selector instanceof MultiplexingChannelSelector);
 
-    Event event1 = new MockEvent();
+    Event event1 = new SimpleEvent();
     Map<String, String> header1 = new HashMap<String, String>();
     header1.put("myheader", "foo");// should match ch1 ch2
     event1.setHeaders(header1);
@@ -298,7 +311,7 @@ public class TestMultiplexingChannelSelector {
     //ch2 should not be there -- since it is a required channel
 
 
-    Event event4 = new MockEvent();
+    Event event4 = new SimpleEvent();
     Map<String, String> header4 = new HashMap<String, String>();
     header4.put("myheader", "zebra");
     event4.setHeaders(header4);

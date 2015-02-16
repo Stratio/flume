@@ -79,7 +79,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 100;
     int numEvents = 3*n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -115,7 +115,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 10;
     int numEvents = n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -157,7 +157,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 100;
     int numEvents = n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -216,7 +216,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 100;
     int numEvents = 3*n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -254,7 +254,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 10000;
     int numEvents = n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -333,7 +333,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 10;
     int numEvents = n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -375,7 +375,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 100;
     int numEvents = 3*n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -415,7 +415,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 100;
     int numEvents = 3*n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -458,7 +458,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 100;
     int numEvents = 3*n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -513,7 +513,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 100;
     int numEvents = 3*n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -556,7 +556,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 100;
     int numEvents = 3*n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -591,7 +591,7 @@ public class TestLoadBalancingSinkProcessor {
     int n = 10;
     int numEvents = n;
     for (int i = 0; i < numEvents; i++) {
-      ch.put(new MockEvent("test" + i));
+      ch.put(new SimpleEvent("test" + i));
     }
 
     MockSink s1 = new MockSink(1);
@@ -688,14 +688,14 @@ public class TestLoadBalancingSinkProcessor {
 
   }
 
-  private static class MockEvent implements Event {
+  private static class SimpleEvent implements Event {
 
     private static final Map<String, String> EMPTY_HEADERS =
         Collections.unmodifiableMap(new HashMap<String, String>());
 
     private byte[] body;
 
-    MockEvent(String str) {
+    SimpleEvent(String str) {
       this.body = str.getBytes();
     }
 
