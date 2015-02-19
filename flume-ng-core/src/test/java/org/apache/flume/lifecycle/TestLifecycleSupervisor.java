@@ -58,7 +58,7 @@ public class TestLifecycleSupervisor {
 
     verify(node1, timeout(10000)).start();
 
-    final MockLifecycleAware node2 = new MockLifecycleAware();
+    final MockLifecycleAware node2 = spy(new MockLifecycleAware());
 
     policy = new SupervisorPolicy.OnceOnlyPolicy();
     supervisor.supervise(node2, policy, LifecycleState.START);

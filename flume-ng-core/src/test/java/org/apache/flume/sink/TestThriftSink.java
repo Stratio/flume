@@ -18,7 +18,12 @@
  */
 package org.apache.flume.sink;
 
-import com.google.common.base.Charsets;
+import java.nio.charset.Charset;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 import org.apache.flume.Context;
 import org.apache.flume.Event;
@@ -32,17 +37,12 @@ import org.apache.flume.conf.Configurables;
 import org.apache.flume.event.EventBuilder;
 import org.apache.flume.lifecycle.LifecycleController;
 import org.apache.flume.lifecycle.LifecycleState;
-
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.TrustManagerFactory;
-import java.nio.charset.Charset;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicLong;
+import com.google.common.base.Charsets;
 
 public class TestThriftSink {
   private ThriftTestingSource src;
@@ -165,9 +165,6 @@ public class TestThriftSink {
       Charset.forName("UTF8"));
 
     sink.start();
-
-    Thread.sleep(500L); // let socket startup
-    Thread.sleep(500L); // sleep a little to allow close occur
 
     Transaction transaction = channel.getTransaction();
     transaction.begin();
