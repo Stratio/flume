@@ -291,7 +291,11 @@ public class ThriftRpcClient extends AbstractRpcClient {
     }
     stateLock.lock();
     try {
-      HostInfo host = HostInfo.getHostInfoList(properties).get(0);
+      final List<HostInfo> hostInfoList = HostInfo.getHostInfoList(properties);
+      if (hostInfoList.isEmpty()) {
+        throw new FlumeException("No host specified");
+      }
+      HostInfo host = hostInfoList.get(0);
       hostname = host.getHostName();
       port = host.getPortNumber();
       protocol = properties.getProperty(CONFIG_PROTOCOL);

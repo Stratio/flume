@@ -18,124 +18,152 @@
  */
 package org.apache.flume.api;
 
+import static org.apache.flume.api.RpcClientAnswer.mockRpcClientStatus;
+import static org.apache.flume.api.RpcClientConfigurationConstants.CONFIG_CLIENT_TYPE;
+import static org.apache.flume.api.RpcClientConfigurationConstants.CONFIG_HOSTS;
+import static org.apache.flume.api.RpcClientConfigurationConstants.CONFIG_HOST_SELECTOR;
+import static org.fest.assertions.Assertions.assertThat;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyListOf;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
+
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 
-import junit.framework.Assert;
-
-import org.apache.avro.ipc.Server;
 import org.apache.flume.Event;
 import org.apache.flume.EventDeliveryException;
 import org.apache.flume.FlumeException;
 import org.apache.flume.api.RpcTestUtils.LoadBalancedAvroHandler;
-import org.apache.flume.api.RpcTestUtils.OKAvroHandler;
 import org.apache.flume.event.EventBuilder;
+import org.apache.flume.util.OrderSelector;
+import org.fest.assertions.Delta;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.rules.ExpectedException;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.rule.PowerMockRule;
 
+import junit.framework.Assert;
+
+@PrepareForTest({LoadBalancingRpcClient.class, RpcClientFactory.class, OrderSelector.class})
 public class TestLoadBalancingRpcClient {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(TestLoadBalancingRpcClient.class);
 
+  @Rule
+  public PowerMockRule powerMock = new PowerMockRule();
 
-  @Test(expected=FlumeException.class)
-  public void testCreatingLbClientSingleHost() {
-    Server server1 = null;
-    RpcClient c = null;
-    try {
-      server1 = RpcTestUtils.startServer(new OKAvroHandler());
-      Properties p = new Properties();
-      p.put("host1", "127.0.0.1:" + server1.getPort());
-      p.put("hosts", "host1");
-      p.put("client.type", "default_loadbalance");
-      RpcClientFactory.getInstance(p);
-    } finally {
-      if (server1 != null) server1.close();
-      if (c != null) c.close();
+  @Rule
+  public ExpectedException thrown = ExpectedException.none();
+
+  LoadBalancingRpcClient c;
+  LoadBalancingRpcClient c2;
+  RpcClientAnswer rpcClientAnswer;
+
+  @Before
+  public void setUp() {
+    PowerMockito.mockStatic(RpcClientFactory.class, withSettings().stubOnly());
+    currentTimeMillis = 0;
+    PowerMockito.spy(System.class);
+    PowerMockito.when(System.currentTimeMillis()).then(new Answer<Long>() {
+      @Override
+      public Long answer(InvocationOnMock invocationOnMock) throws Throwable {
+        return currentTimeMillis;
+      }
+    });
+  }
+
+  private long currentTimeMillis;
+
+  private void setCurrentTimeMillis(final long currentTimeMillis) {
+    this.currentTimeMillis = currentTimeMillis;
+  }
+
+  @After
+  public void tearDown() {
+    if (c != null) {
+      c.close();
+      c = null;
     }
+    if (c2 != null) {
+      c2.close();
+      c2 = null;
+    }
+    rpcClientAnswer = null;
+  }
+
+  @Test
+  public void testCreatingLbClientSingleHostFails() {
+    Properties p = new Properties();
+    p.put("host1", "127.0.0.1:80");
+    p.put("hosts", "host1");
+    p.put("client.type", "default_loadbalance");
+    c = new LoadBalancingRpcClient();
+    thrown.expect(FlumeException.class);
+    thrown.expectMessage("At least two hosts are required to use the load balancing RPC client.");
+    c.configure(p);
   }
 
   @Test
   public void testTwoHostFailover() throws Exception {
-    Server s1 = null, s2 = null;
-    RpcClient c = null;
-    try{
-      LoadBalancedAvroHandler h1 = new LoadBalancedAvroHandler();
-      LoadBalancedAvroHandler h2 = new LoadBalancedAvroHandler();
+    Properties p = new Properties();
+    p.put("hosts", "h1 h2");
+    p.put("client.type", "default_loadbalance");
+    p.put("hosts.h1", "127.0.0.1:80");
+    p.put("hosts.h2", "127.0.0.1:81");
 
-      s1 = RpcTestUtils.startServer(h1);
-      s2 = RpcTestUtils.startServer(h2);
+    rpcClientAnswer = new RpcClientAnswer(2);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
 
-      Properties p = new Properties();
-      p.put("hosts", "h1 h2");
-      p.put("client.type", "default_loadbalance");
-      p.put("hosts.h1", "127.0.0.1:" + s1.getPort());
-      p.put("hosts.h2", "127.0.0.1:" + s2.getPort());
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
 
-      c = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c instanceof LoadBalancingRpcClient);
+    Assert.assertTrue(c instanceof LoadBalancingRpcClient);
 
-      for (int i = 0; i < 100; i++) {
-        if (i == 20) {
-          h2.setFailed();
-        } else if (i == 40) {
-          h2.setOK();
-        }
-        c.append(getEvent(i));
+    for (int i = 0; i < 100; i++) {
+      if (i == 20) {
+        assertThat(rpcClientAnswer.getClients().size()).isEqualTo(2);
+        mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
+      } else if (i == 40) {
+        mockRpcClientStatus(rpcClientAnswer.getClients().get(1), true);
       }
-
-      Assert.assertEquals(60, h1.getAppendCount());
-      Assert.assertEquals(40, h2.getAppendCount());
-    } finally {
-      if (s1 != null) s1.close();
-      if (s2 != null) s2.close();
-      if (c != null) c.close();
+      c.append(getEvent(i));
     }
+
+    verify(rpcClientAnswer.getClients().get(0), times(60)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(50)).append(any(Event.class));
   }
 
+  @Test
   // This will fail without FLUME-1823
-  @Test(expected = EventDeliveryException.class)
   public void testTwoHostFailoverThrowAfterClose() throws Exception {
-    Server s1 = null, s2 = null;
-    RpcClient c = null;
-    try{
-      LoadBalancedAvroHandler h1 = new LoadBalancedAvroHandler();
-      LoadBalancedAvroHandler h2 = new LoadBalancedAvroHandler();
+    Properties p = new Properties();
+    p.put("hosts", "h1 h2");
+    p.put("client.type", "default_loadbalance");
+    p.put("hosts.h1", "127.0.0.1:80");
+    p.put("hosts.h2", "127.0.0.1:81");
 
-      s1 = RpcTestUtils.startServer(h1);
-      s2 = RpcTestUtils.startServer(h2);
+    rpcClientAnswer = new RpcClientAnswer(2);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
 
-      Properties p = new Properties();
-      p.put("hosts", "h1 h2");
-      p.put("client.type", "default_loadbalance");
-      p.put("hosts.h1", "127.0.0.1:" + s1.getPort());
-      p.put("hosts.h2", "127.0.0.1:" + s2.getPort());
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
 
-      c = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < 100; i++) {
-        if (i == 20) {
-          h2.setFailed();
-        } else if (i == 40) {
-          h2.setOK();
-        }
-        c.append(getEvent(i));
-      }
-
-      Assert.assertEquals(60, h1.getAppendCount());
-      Assert.assertEquals(40, h2.getAppendCount());
-      if (c != null) c.close();
-      c.append(getEvent(3));
-      Assert.fail();
-    } finally {
-      if (s1 != null) s1.close();
-      if (s2 != null) s2.close();
+    for (int i = 0; i < 5; i++) {
+      c.append(getEvent(i));
     }
+
+    c.close();
+    thrown.expect(EventDeliveryException.class);
+    thrown.expectMessage("Rpc Client is closed");
+    c.append(getEvent(3));
   }
 
   /**
@@ -144,370 +172,336 @@ public class TestLoadBalancingRpcClient {
    */
   @Test
   public void testTwoHostsOneDead() throws Exception {
-    LOGGER.info("Running testTwoHostsOneDead...");
-    Server s1 = null;
-    RpcClient c1 = null, c2 = null;
-    try {
-      LoadBalancedAvroHandler h1 = new LoadBalancedAvroHandler();
-      s1 = RpcTestUtils.startServer(h1);
-      // do not create a 2nd server (assume it's "down")
+    Properties p = new Properties();
+    p.put("hosts", "h1 h2");
+    p.put("client.type", "default_loadbalance");
+    p.put("hosts.h1", "127.0.0.1:80");
+    p.put("hosts.h2", "127.0.0.1:81");
 
-      Properties p = new Properties();
-      p.put("hosts", "h1 h2");
-      p.put("client.type", "default_loadbalance");
-      p.put("hosts.h1", "127.0.0.1:" + 0); // port 0 should always be closed
-      p.put("hosts.h2", "127.0.0.1:" + s1.getPort());
+    rpcClientAnswer = new RpcClientAnswer(2);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
 
-      // test batch API
-      c1 = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c1 instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < 10; i++) {
-        c1.appendBatch(getBatchedEvent(i));
-      }
-      Assert.assertEquals(10, h1.getAppendBatchCount());
-
-      // test non-batch API
-      c2 = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c2 instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < 10; i++) {
-        c2.append(getEvent(i));
-      }
-      Assert.assertEquals(10, h1.getAppendCount());
-
-
-    } finally {
-      if (s1 != null) s1.close();
-      if (c1 != null) c1.close();
-      if (c2 != null) c2.close();
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
+    for (int i = 0; i < 10; i++) {
+      c.append(getEvent(i));
     }
+    c.close();
+
+    verify(rpcClientAnswer.getClients().get(0), times(10)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(5)).append(any(Event.class));
+  }
+
+  @Test
+  public void testTwoHostsOneDeadBatch() throws Exception {
+    Properties p = new Properties();
+    p.put("hosts", "h1 h2");
+    p.put("client.type", "default_loadbalance");
+    p.put("hosts.h1", "127.0.0.1:80");
+    p.put("hosts.h2", "127.0.0.1:81");
+
+    rpcClientAnswer = new RpcClientAnswer(2);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
+
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
+    for (int i = 0; i < 10; i++) {
+      c.appendBatch(getBatchedEvent(i));
+    }
+    c.close();
+
+    verify(rpcClientAnswer.getClients().get(0), times(10)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(5)).appendBatch(anyListOf(Event.class));
   }
 
   @Test
   public void testTwoHostFailoverBatch() throws Exception {
-    Server s1 = null, s2 = null;
-    RpcClient c = null;
-    try{
-      LoadBalancedAvroHandler h1 = new LoadBalancedAvroHandler();
-      LoadBalancedAvroHandler h2 = new LoadBalancedAvroHandler();
+    Properties p = new Properties();
+    p.put("hosts", "h1 h2");
+    p.put("client.type", "default_loadbalance");
+    p.put("hosts.h1", "127.0.0.1:80");
+    p.put("hosts.h2", "127.0.0.1:81");
 
-      s1 = RpcTestUtils.startServer(h1);
-      s2 = RpcTestUtils.startServer(h2);
+    rpcClientAnswer = new RpcClientAnswer(2);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
 
-      Properties p = new Properties();
-      p.put("hosts", "h1 h2");
-      p.put("client.type", "default_loadbalance");
-      p.put("hosts.h1", "127.0.0.1:" + s1.getPort());
-      p.put("hosts.h2", "127.0.0.1:" + s2.getPort());
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
 
-      c = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < 100; i++) {
-        if (i == 20) {
-          h2.setFailed();
-        } else if (i == 40) {
-          h2.setOK();
-        }
-
-        c.appendBatch(getBatchedEvent(i));
+    for (int i = 0; i < 100; i++) {
+      if (i == 20) {
+        assertThat(rpcClientAnswer.getClients().size()).isEqualTo(2);
+        mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
+      } else if (i == 40) {
+        mockRpcClientStatus(rpcClientAnswer.getClients().get(1), true);
       }
-
-      Assert.assertEquals(60, h1.getAppendBatchCount());
-      Assert.assertEquals(40, h2.getAppendBatchCount());
-    } finally {
-      if (s1 != null) s1.close();
-      if (s2 != null) s2.close();
-      if (c != null) c.close();
+      c.appendBatch(getBatchedEvent(i));
     }
+
+    verify(rpcClientAnswer.getClients().get(0), times(60)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(50)).appendBatch(anyListOf(Event.class));
   }
 
   @Test
   public void testLbDefaultClientTwoHosts() throws Exception {
-    Server s1 = null, s2 = null;
-    RpcClient c = null;
-    try{
-      LoadBalancedAvroHandler h1 = new LoadBalancedAvroHandler();
-      LoadBalancedAvroHandler h2 = new LoadBalancedAvroHandler();
+    Properties p = new Properties();
+    p.put("hosts", "h1 h2");
+    p.put("client.type", "default_loadbalance");
+    p.put("hosts.h1", "127.0.0.1:80");
+    p.put("hosts.h2", "127.0.0.1:81");
 
-      s1 = RpcTestUtils.startServer(h1);
-      s2 = RpcTestUtils.startServer(h2);
+    rpcClientAnswer = new RpcClientAnswer(2);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
 
-      Properties p = new Properties();
-      p.put("hosts", "h1 h2");
-      p.put("client.type", "default_loadbalance");
-      p.put("hosts.h1", "127.0.0.1:" + s1.getPort());
-      p.put("hosts.h2", "127.0.0.1:" + s2.getPort());
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
 
-      c = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < 100; i++) {
-        c.append(getEvent(i));
-      }
-
-      Assert.assertEquals(50, h1.getAppendCount());
-      Assert.assertEquals(50, h2.getAppendCount());
-    } finally {
-      if (s1 != null) s1.close();
-      if (s2 != null) s2.close();
-      if (c != null) c.close();
+    for (int i = 0; i < 100; i++) {
+      c.append(getEvent(i));
     }
+
+    verify(rpcClientAnswer.getClients().get(0), times(50)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(50)).append(any(Event.class));
   }
 
   @Test
   public void testLbDefaultClientTwoHostsBatch() throws Exception {
-    Server s1 = null, s2 = null;
-    RpcClient c = null;
-    try{
-      LoadBalancedAvroHandler h1 = new LoadBalancedAvroHandler();
-      LoadBalancedAvroHandler h2 = new LoadBalancedAvroHandler();
+    Properties p = new Properties();
+    p.put("hosts", "h1 h2");
+    p.put("client.type", "default_loadbalance");
+    p.put("hosts.h1", "127.0.0.1:80");
+    p.put("hosts.h2", "127.0.0.1:81");
 
-      s1 = RpcTestUtils.startServer(h1);
-      s2 = RpcTestUtils.startServer(h2);
+    rpcClientAnswer = new RpcClientAnswer(2);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
 
-      Properties p = new Properties();
-      p.put("hosts", "h1 h2");
-      p.put("client.type", "default_loadbalance");
-      p.put("hosts.h1", "127.0.0.1:" + s1.getPort());
-      p.put("hosts.h2", "127.0.0.1:" + s2.getPort());
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
 
-      c = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < 100; i++) {
-        c.appendBatch(getBatchedEvent(i));
-      }
-
-      Assert.assertEquals(50, h1.getAppendBatchCount());
-      Assert.assertEquals(50, h2.getAppendBatchCount());
-    } finally {
-      if (s1 != null) s1.close();
-      if (s2 != null) s2.close();
-      if (c != null) c.close();
+    for (int i = 0; i < 100; i++) {
+      c.appendBatch(getBatchedEvent(i));
     }
+
+    verify(rpcClientAnswer.getClients().get(0), times(50)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(50)).appendBatch(anyListOf(Event.class));
   }
 
   @Test
   public void testLbClientTenHostRandomDistribution() throws Exception {
     final int NUM_HOSTS = 10;
     final int NUM_EVENTS = 1000;
-    Server[] s = new Server[NUM_HOSTS];
     LoadBalancedAvroHandler[] h = new LoadBalancedAvroHandler[NUM_HOSTS];
-    RpcClient c = null;
-    try{
-      Properties p = new Properties();
-      StringBuilder hostList = new StringBuilder("");
-      for (int i = 0; i<NUM_HOSTS; i++) {
-        h[i] = new LoadBalancedAvroHandler();
-        s[i] = RpcTestUtils.startServer(h[i]);
-        String name = "h" + i;
-        p.put("hosts." + name, "127.0.0.1:" + s[i].getPort());
-        hostList.append(name).append(" ");
-      }
-
-      p.put("hosts", hostList.toString().trim());
-      p.put("client.type", "default_loadbalance");
-      p.put("host-selector", "random");
-
-      c = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < NUM_EVENTS; i++) {
-        c.append(getEvent(i));
-      }
-
-      Set<Integer> counts = new HashSet<Integer>();
-      int total = 0;
-      for (LoadBalancedAvroHandler handler : h) {
-        total += handler.getAppendCount();
-        counts.add(handler.getAppendCount());
-      }
-
-      Assert.assertTrue("Very unusual distribution", counts.size() > 2);
-      Assert.assertTrue("Missing events", total == NUM_EVENTS);
-    } finally {
-      for (int i = 0; i<NUM_HOSTS; i++) {
-        if (s[i] != null) s[i].close();
-      }
+    Properties p = new Properties();
+    StringBuilder hostList = new StringBuilder("");
+    for (int i = 0; i<NUM_HOSTS; i++) {
+      h[i] = new LoadBalancedAvroHandler();
+      String name = "h" + i;
+      p.put("hosts." + name, "127.0.0.1:10" + i);
+      hostList.append(name).append(" ");
     }
+
+    p.put("hosts", hostList.toString().trim());
+    p.put("client.type", "default_loadbalance");
+    p.put("host-selector", "random");
+
+    rpcClientAnswer = new RpcClientAnswer(NUM_HOSTS);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
+
+    for (int i = 0; i < NUM_EVENTS; i++) {
+      c.append(getEvent(i));
+    }
+
+    int total = 0;
+    double[] probs = new double[NUM_HOSTS];
+    double expectedProb = 1.0 / NUM_HOSTS;
+    double allowedDeviation = 0.3;
+    for (int i = 0; i < NUM_HOSTS; i++) {
+      int calls = rpcClientAnswer.getClients().get(i).appendCalls;
+      total += calls;
+      probs[i] = calls;
+      probs[i] /= NUM_EVENTS;
+      assertThat(probs[i]).isEqualTo(expectedProb, Delta.delta(expectedProb * allowedDeviation));
+    }
+    assertThat(total).isEqualTo(NUM_EVENTS);
   }
 
   @Test
   public void testLbClientTenHostRandomDistributionBatch() throws Exception {
     final int NUM_HOSTS = 10;
     final int NUM_EVENTS = 1000;
-    Server[] s = new Server[NUM_HOSTS];
     LoadBalancedAvroHandler[] h = new LoadBalancedAvroHandler[NUM_HOSTS];
-    RpcClient c = null;
-    try{
-      Properties p = new Properties();
-      StringBuilder hostList = new StringBuilder("");
-      for (int i = 0; i<NUM_HOSTS; i++) {
-        h[i] = new LoadBalancedAvroHandler();
-        s[i] = RpcTestUtils.startServer(h[i]);
-        String name = "h" + i;
-        p.put("hosts." + name, "127.0.0.1:" + s[i].getPort());
-        hostList.append(name).append(" ");
-      }
-
-      p.put("hosts", hostList.toString().trim());
-      p.put("client.type", "default_loadbalance");
-      p.put("host-selector", "random");
-
-      c = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < NUM_EVENTS; i++) {
-        c.appendBatch(getBatchedEvent(i));
-      }
-
-      Set<Integer> counts = new HashSet<Integer>();
-      int total = 0;
-      for (LoadBalancedAvroHandler handler : h) {
-        total += handler.getAppendBatchCount();
-        counts.add(handler.getAppendBatchCount());
-      }
-
-      Assert.assertTrue("Very unusual distribution", counts.size() > 2);
-      Assert.assertTrue("Missing events", total == NUM_EVENTS);
-    } finally {
-      for (int i = 0; i<NUM_HOSTS; i++) {
-        if (s[i] != null) s[i].close();
-      }
+    Properties p = new Properties();
+    StringBuilder hostList = new StringBuilder("");
+    for (int i = 0; i<NUM_HOSTS; i++) {
+      h[i] = new LoadBalancedAvroHandler();
+      String name = "h" + i;
+      p.put("hosts." + name, "127.0.0.1:10" + i);
+      hostList.append(name).append(" ");
     }
+
+    p.put("hosts", hostList.toString().trim());
+    p.put("client.type", "default_loadbalance");
+    p.put("host-selector", "random");
+
+    rpcClientAnswer = new RpcClientAnswer(NUM_HOSTS);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
+
+    for (int i = 0; i < NUM_EVENTS; i++) {
+      c.appendBatch(getBatchedEvent(i));
+    }
+
+    int total = 0;
+    double[] probs = new double[NUM_HOSTS];
+    double expectedProb = 1.0 / NUM_HOSTS;
+    double allowedDeviation = 0.3;
+    for (int i = 0; i < NUM_HOSTS; i++) {
+      int calls = rpcClientAnswer.getClients().get(i).appendBatchCalls;
+      total += calls;
+      probs[i] = calls;
+      probs[i] /= NUM_EVENTS;
+      assertThat(probs[i]).isEqualTo(expectedProb, Delta.delta(expectedProb * allowedDeviation));
+    }
+    assertThat(total).isEqualTo(NUM_EVENTS);
   }
 
   @Test
   public void testLbClientTenHostRoundRobinDistribution() throws Exception {
     final int NUM_HOSTS = 10;
     final int NUM_EVENTS = 1000;
-    Server[] s = new Server[NUM_HOSTS];
     LoadBalancedAvroHandler[] h = new LoadBalancedAvroHandler[NUM_HOSTS];
-    RpcClient c = null;
-    try{
-      Properties p = new Properties();
-      StringBuilder hostList = new StringBuilder("");
-      for (int i = 0; i<NUM_HOSTS; i++) {
-        h[i] = new LoadBalancedAvroHandler();
-        s[i] = RpcTestUtils.startServer(h[i]);
-        String name = "h" + i;
-        p.put("hosts." + name, "127.0.0.1:" + s[i].getPort());
-        hostList.append(name).append(" ");
-      }
-
-      p.put("hosts", hostList.toString().trim());
-      p.put("client.type", "default_loadbalance");
-      p.put("host-selector", "round_robin");
-
-      c = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < NUM_EVENTS; i++) {
-        c.append(getEvent(i));
-      }
-
-      Set<Integer> counts = new HashSet<Integer>();
-      int total = 0;
-      for (LoadBalancedAvroHandler handler : h) {
-        total += handler.getAppendCount();
-        counts.add(handler.getAppendCount());
-      }
-
-      Assert.assertTrue("Very unusual distribution", counts.size() == 1);
-      Assert.assertTrue("Missing events", total == NUM_EVENTS);
-    } finally {
-      for (int i = 0; i<NUM_HOSTS; i++) {
-        if (s[i] != null) s[i].close();
-      }
+    Properties p = new Properties();
+    StringBuilder hostList = new StringBuilder("");
+    for (int i = 0; i<NUM_HOSTS; i++) {
+      h[i] = new LoadBalancedAvroHandler();
+      String name = "h" + i;
+      p.put("hosts." + name, "127.0.0.1:10" + i);
+      hostList.append(name).append(" ");
     }
+
+    p.put("hosts", hostList.toString().trim());
+    p.put("client.type", "default_loadbalance");
+    p.put("host-selector", "round_robin");
+
+    rpcClientAnswer = new RpcClientAnswer(NUM_HOSTS);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
+
+    for (int i = 0; i < NUM_EVENTS; i++) {
+      c.append(getEvent(i));
+    }
+
+    int total = 0;
+    double[] probs = new double[NUM_HOSTS];
+    double expectedProb = 1.0 / NUM_HOSTS;
+    double allowedDeviation = 0.0;
+    for (int i = 0; i < NUM_HOSTS; i++) {
+      int calls = rpcClientAnswer.getClients().get(i).appendCalls;
+      total += calls;
+      probs[i] = calls;
+      probs[i] /= NUM_EVENTS;
+      assertThat(probs[i]).isEqualTo(expectedProb, Delta.delta(expectedProb * allowedDeviation));
+    }
+    assertThat(total).isEqualTo(NUM_EVENTS);
   }
 
   @Test
-  public void testLbClientTenHostRoundRobinDistributionBatch() throws Exception
-  {
+  public void testLbClientTenHostRoundRobinDistributionBatch() throws Exception {
     final int NUM_HOSTS = 10;
     final int NUM_EVENTS = 1000;
-    Server[] s = new Server[NUM_HOSTS];
     LoadBalancedAvroHandler[] h = new LoadBalancedAvroHandler[NUM_HOSTS];
-    RpcClient c = null;
-    try{
-      Properties p = new Properties();
-      StringBuilder hostList = new StringBuilder("");
-      for (int i = 0; i<NUM_HOSTS; i++) {
-        h[i] = new LoadBalancedAvroHandler();
-        s[i] = RpcTestUtils.startServer(h[i]);
-        String name = "h" + i;
-        p.put("hosts." + name, "127.0.0.1:" + s[i].getPort());
-        hostList.append(name).append(" ");
-      }
-
-      p.put("hosts", hostList.toString().trim());
-      p.put("client.type", "default_loadbalance");
-      p.put("host-selector", "round_robin");
-
-      c = RpcClientFactory.getInstance(p);
-      Assert.assertTrue(c instanceof LoadBalancingRpcClient);
-
-      for (int i = 0; i < NUM_EVENTS; i++) {
-        c.appendBatch(getBatchedEvent(i));
-      }
-
-      Set<Integer> counts = new HashSet<Integer>();
-      int total = 0;
-      for (LoadBalancedAvroHandler handler : h) {
-        total += handler.getAppendBatchCount();
-        counts.add(handler.getAppendBatchCount());
-      }
-
-      Assert.assertTrue("Very unusual distribution", counts.size() == 1);
-      Assert.assertTrue("Missing events", total == NUM_EVENTS);
-    } finally {
-      for (int i = 0; i<NUM_HOSTS; i++) {
-        if (s[i] != null) s[i].close();
-      }
+    Properties p = new Properties();
+    StringBuilder hostList = new StringBuilder("");
+    for (int i = 0; i<NUM_HOSTS; i++) {
+      h[i] = new LoadBalancedAvroHandler();
+      String name = "h" + i;
+      p.put("hosts." + name, "127.0.0.1:10" + i);
+      hostList.append(name).append(" ");
     }
+
+    p.put("hosts", hostList.toString().trim());
+    p.put("client.type", "default_loadbalance");
+    p.put("host-selector", "round_robin");
+
+    rpcClientAnswer = new RpcClientAnswer(NUM_HOSTS);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
+
+    for (int i = 0; i < NUM_EVENTS; i++) {
+      c.appendBatch(getBatchedEvent(i));
+    }
+
+    int total = 0;
+    double[] probs = new double[NUM_HOSTS];
+    double expectedProb = 1.0 / NUM_HOSTS;
+    double allowedDeviation = 0.0;
+    for (int i = 0; i < NUM_HOSTS; i++) {
+      int calls = rpcClientAnswer.getClients().get(i).appendBatchCalls;
+      total += calls;
+      probs[i] = calls;
+      probs[i] /= NUM_EVENTS;
+      assertThat(probs[i]).isEqualTo(expectedProb, Delta.delta(expectedProb * allowedDeviation));
+    }
+    assertThat(total).isEqualTo(NUM_EVENTS);
   }
 
   @Test
   public void testRandomBackoff() throws Exception {
+    final int NUM_HOSTS = 3;
+    final int NUM_EVENTS = 50;
+    final long MAX_BACKOFF = 1000;
+
+    rpcClientAnswer = new RpcClientAnswer(NUM_HOSTS);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+
     Properties p = new Properties();
-    List<LoadBalancedAvroHandler> hosts =
-            new ArrayList<LoadBalancedAvroHandler>();
-    List<Server> servers = new ArrayList<Server>();
     StringBuilder hostList = new StringBuilder("");
-    for(int i = 0; i < 3;i++){
-      LoadBalancedAvroHandler s = new LoadBalancedAvroHandler();
-      hosts.add(s);
-      Server srv = RpcTestUtils.startServer(s);
-      servers.add(srv);
+    for(int i = 0; i < NUM_HOSTS;i++){
       String name = "h" + i;
-      p.put("hosts." + name, "127.0.0.1:" + srv.getPort());
+      p.put("hosts." + name, "127.0.0.1:100" + i);
       hostList.append(name).append(" ");
     }
     p.put("hosts", hostList.toString().trim());
     p.put("client.type", "default_loadbalance");
     p.put("host-selector", "random");
     p.put("backoff", "true");
-    hosts.get(0).setFailed();
-    hosts.get(2).setFailed();
+    p.put("maxBackoff", Long.toString(MAX_BACKOFF));
 
-    RpcClient c = RpcClientFactory.getInstance(p);
-    Assert.assertTrue(c instanceof LoadBalancingRpcClient);
+    // Hosts 0 and 2 should backoff
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(0), false);
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(2), false);
+
+    setCurrentTimeMillis(0);
+
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
 
     // TODO: there is a remote possibility that s0 or s2
     // never get hit by the random assignment
     // and thus not backoffed, causing the test to fail
-    for(int i=0; i < 50; i++) {
+    for(int i=0; i < NUM_EVENTS; i++) {
       // a well behaved runner would always check the return.
       c.append(EventBuilder.withBody(("test" + String.valueOf(i)).getBytes()));
     }
-    Assert.assertEquals(50, hosts.get(1).getAppendCount());
-    Assert.assertEquals(0, hosts.get(0).getAppendCount());
-    Assert.assertEquals(0, hosts.get(2).getAppendCount());
-    hosts.get(0).setOK();
-    hosts.get(1).setFailed(); // s0 should still be backed off
+    verify(rpcClientAnswer.getClients().get(0), times(1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(50)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1)).append(any(Event.class));
+
+    // Host 2 keeps backoff
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(0), true);
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
+
     try {
       c.append(EventBuilder.withBody("shouldfail".getBytes()));
       // nothing should be able to process right now
@@ -515,30 +509,30 @@ public class TestLoadBalancingRpcClient {
     } catch (EventDeliveryException e) {
       // this is expected
     }
-    Thread.sleep(2500); // wait for s0 to no longer be backed off
 
-    for (int i = 0; i < 50; i++) {
+    setCurrentTimeMillis(1001); // wait for s0 to no longer be backed off
+
+    for (int i = 0; i < NUM_EVENTS; i++) {
       // a well behaved runner would always check the return.
       c.append(EventBuilder.withBody(("test" + String.valueOf(i)).getBytes()));
     }
-    Assert.assertEquals(50, hosts.get(0).getAppendCount());
-    Assert.assertEquals(50, hosts.get(1).getAppendCount());
-    Assert.assertEquals(0, hosts.get(2).getAppendCount());
+    verify(rpcClientAnswer.getClients().get(0), times(51)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(52)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(2)).append(any(Event.class));
   }
+
   @Test
   public void testRoundRobinBackoffInitialFailure() throws EventDeliveryException {
+    final int NUM_HOSTS = 3;
+
+    rpcClientAnswer = new RpcClientAnswer(NUM_HOSTS);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+
     Properties p = new Properties();
-    List<LoadBalancedAvroHandler> hosts =
-            new ArrayList<LoadBalancedAvroHandler>();
-    List<Server> servers = new ArrayList<Server>();
     StringBuilder hostList = new StringBuilder("");
-    for (int i = 0; i < 3; i++) {
-      LoadBalancedAvroHandler s = new LoadBalancedAvroHandler();
-      hosts.add(s);
-      Server srv = RpcTestUtils.startServer(s);
-      servers.add(srv);
+    for(int i = 0; i < NUM_HOSTS;i++){
       String name = "h" + i;
-      p.put("hosts." + name, "127.0.0.1:" + srv.getPort());
+      p.put("hosts." + name, "127.0.0.1:100" + i);
       hostList.append(name).append(" ");
     }
     p.put("hosts", hostList.toString().trim());
@@ -546,127 +540,136 @@ public class TestLoadBalancingRpcClient {
     p.put("host-selector", "round_robin");
     p.put("backoff", "true");
 
-    RpcClient c = RpcClientFactory.getInstance(p);
-    Assert.assertTrue(c instanceof LoadBalancingRpcClient);
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
 
     for (int i = 0; i < 3; i++) {
       c.append(EventBuilder.withBody("testing".getBytes()));
     }
-    hosts.get(1).setFailed();
+    verify(rpcClientAnswer.getClients().get(0), times(1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1)).append(any(Event.class));
+
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
     for (int i = 0; i < 3; i++) {
       c.append(EventBuilder.withBody("testing".getBytes()));
     }
-    hosts.get(1).setOK();
+    verify(rpcClientAnswer.getClients().get(0), times(1 + 2)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1 + 1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1 + 1)).append(any(Event.class));
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), true);
+
     //This time the iterators will never have "1".
     //So clients get in the order: 1 - 3 - 1
     for (int i = 0; i < 3; i++) {
       c.append(EventBuilder.withBody("testing".getBytes()));
     }
 
-    Assert.assertEquals(1 + 2 + 1, hosts.get(0).getAppendCount());
-    Assert.assertEquals(1, hosts.get(1).getAppendCount());
-    Assert.assertEquals(1 + 1 + 2, hosts.get(2).getAppendCount());
-  }
-
-  @Test
-  public void testRoundRobinBackoffIncreasingBackoffs() throws Exception {
-    Properties p = new Properties();
-    List<LoadBalancedAvroHandler> hosts =
-            new ArrayList<LoadBalancedAvroHandler>();
-    List<Server> servers = new ArrayList<Server>();
-    StringBuilder hostList = new StringBuilder("");
-    for (int i = 0; i < 3; i++) {
-      LoadBalancedAvroHandler s = new LoadBalancedAvroHandler();
-      hosts.add(s);
-      if(i == 1) {
-        s.setFailed();
-      }
-      Server srv = RpcTestUtils.startServer(s);
-      servers.add(srv);
-      String name = "h" + i;
-      p.put("hosts." + name, "127.0.0.1:" + srv.getPort());
-      hostList.append(name).append(" ");
-    }
-    p.put("hosts", hostList.toString().trim());
-    p.put("client.type", "default_loadbalance");
-    p.put("host-selector", "round_robin");
-    p.put("backoff", "true");
-
-    RpcClient c = RpcClientFactory.getInstance(p);
-    Assert.assertTrue(c instanceof LoadBalancingRpcClient);
-
-    for (int i = 0; i < 3; i++) {
-      c.append(EventBuilder.withBody("testing".getBytes()));
-    }
-    Assert.assertEquals(0, hosts.get(1).getAppendCount());
-    Thread.sleep(2100);
-    // this should let the sink come out of backoff and get backed off  for a longer time
-    for (int i = 0; i < 3; i++) {
-      c.append(EventBuilder.withBody("testing".getBytes()));
-    }
-    Assert.assertEquals(0, hosts.get(1).getAppendCount());
-    hosts.get(1).setOK();
-    Thread.sleep(2100);
-    // this time it shouldn't come out of backoff yet as the timeout isn't over
-    for (int i = 0; i < 3; i++) {
-      c.append(EventBuilder.withBody("testing".getBytes()));
-
-    }
-    Assert.assertEquals(0, hosts.get(1).getAppendCount());
-    // after this s2 should be receiving events agains
-    Thread.sleep(2500);
-    int numEvents = 60;
-    for (int i = 0; i < numEvents; i++) {
-      c.append(EventBuilder.withBody("testing".getBytes()));
-    }
-
-    Assert.assertEquals( 2 + 2 + 1 + (numEvents/3), hosts.get(0).getAppendCount());
-    Assert.assertEquals((numEvents/3), hosts.get(1).getAppendCount());
-    Assert.assertEquals(1 + 1 + 2 + (numEvents/3), hosts.get(2).getAppendCount());
+    verify(rpcClientAnswer.getClients().get(0), times(1 + 2 + 1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1 + 1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1 + 1 + 2)).append(any(Event.class));
   }
 
   @Test
   public void testRoundRobinBackoffFailureRecovery() throws EventDeliveryException, InterruptedException {
+    final int NUM_HOSTS = 3;
+    final long MAX_BACKOFF = 1000;
+
+    rpcClientAnswer = new RpcClientAnswer(NUM_HOSTS);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+
     Properties p = new Properties();
-    List<LoadBalancedAvroHandler> hosts =
-            new ArrayList<LoadBalancedAvroHandler>();
-    List<Server> servers = new ArrayList<Server>();
     StringBuilder hostList = new StringBuilder("");
-    for (int i = 0; i < 3; i++) {
-      LoadBalancedAvroHandler s = new LoadBalancedAvroHandler();
-      hosts.add(s);
-      if (i == 1) {
-        s.setFailed();
-      }
-      Server srv = RpcTestUtils.startServer(s);
-      servers.add(srv);
+    for(int i = 0; i < NUM_HOSTS;i++){
       String name = "h" + i;
-      p.put("hosts." + name, "127.0.0.1:" + srv.getPort());
+      p.put("hosts." + name, "127.0.0.1:100" + i);
       hostList.append(name).append(" ");
     }
     p.put("hosts", hostList.toString().trim());
     p.put("client.type", "default_loadbalance");
     p.put("host-selector", "round_robin");
     p.put("backoff", "true");
+    p.put("maxBackoff", Long.toString(MAX_BACKOFF));
 
-    RpcClient c = RpcClientFactory.getInstance(p);
-    Assert.assertTrue(c instanceof LoadBalancingRpcClient);
+    setCurrentTimeMillis(0);
 
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
 
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
     for (int i = 0; i < 3; i++) {
       c.append(EventBuilder.withBody("recovery test".getBytes()));
     }
-    hosts.get(1).setOK();
-    Thread.sleep(3000);
+    verify(rpcClientAnswer.getClients().get(0), times(2)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1)).append(any(Event.class));
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), true);
+
+    setCurrentTimeMillis(1001);
     int numEvents = 60;
 
     for(int i = 0; i < numEvents; i++){
       c.append(EventBuilder.withBody("testing".getBytes()));
     }
+    verify(rpcClientAnswer.getClients().get(0), times(2 + numEvents / 3)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1 + numEvents / 3)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1 + numEvents / 3)).append(any(Event.class));
+  }
 
-    Assert.assertEquals(2 + (numEvents/3) , hosts.get(0).getAppendCount());
-    Assert.assertEquals(0 + (numEvents/3), hosts.get(1).getAppendCount());
-    Assert.assertEquals(1 + (numEvents/3), hosts.get(2).getAppendCount());
+  /**
+   * LoadBalancingRpcClient closes unactive clients (isActive() == false), but only
+   * after second attempt.
+   *
+   * @throws EventDeliveryException
+   */
+  @Test
+  public void testInactiveClientIsClosed() throws EventDeliveryException {
+    Properties p = new Properties();
+    p.put("hosts", "h1 h2");
+    p.put("client.type", "default_loadbalance");
+    p.put("hosts.h1", "127.0.0.1:80");
+    p.put("hosts.h2", "127.0.0.1:81");
+
+    rpcClientAnswer = new RpcClientAnswer(2);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(0), false);
+    when(rpcClientAnswer.getClients().get(0).isActive()).thenReturn(false);
+
+    c = new LoadBalancingRpcClient();
+    c.configure(p);
+
+    c.append(getEvent(1));
+    verify(rpcClientAnswer.getClients().get(0), times(1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1)).append(any(Event.class));
+
+    //mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
+    //when(rpcClientAnswer.getClients().get(1).isActive()).thenReturn(false);
+
+    c.append(getEvent(1));
+    verify(rpcClientAnswer.getClients().get(0), times(1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(2)).append(any(Event.class));
+
+    c.append(getEvent(1));
+    verify(rpcClientAnswer.getClients().get(0), times(1)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(3)).append(any(Event.class));
+    verify(rpcClientAnswer.getClients().get(0), times(1)).close();
+
+    c.close();
+  }
+
+  @Test
+  public void testBadHostSelector() throws EventDeliveryException {
+    Properties p = new Properties();
+    p.put(CONFIG_HOSTS, "h1 h2");
+    p.put(CONFIG_CLIENT_TYPE, "default_loadbalance");
+    p.put("hosts.h1", "127.0.0.1:80");
+    p.put("hosts.h2", "127.0.0.1:81");
+    p.put(CONFIG_HOST_SELECTOR, "org.apace.BadClassXXX");
+    c = new LoadBalancingRpcClient();
+    thrown.expect(FlumeException.class);
+    thrown.expectMessage("Unable to instantiate host selector: org.apace.BadClassXXX");
+    c.configure(p);
   }
 
   private List<Event> getBatchedEvent(int index) {
@@ -678,5 +681,10 @@ public class TestLoadBalancingRpcClient {
   private Event getEvent(int index) {
     return EventBuilder.withBody(("event: " + index).getBytes());
   }
+
+
+
+
+
 
 }

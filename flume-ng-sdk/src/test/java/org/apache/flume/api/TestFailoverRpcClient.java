@@ -18,22 +18,58 @@
  */
 package org.apache.flume.api;
 
-import java.net.InetSocketAddress;
-import java.nio.charset.Charset;
+import static org.apache.flume.api.RpcClientAnswer.mockRpcClientStatus;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyListOf;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-import org.apache.avro.ipc.Server;
 import org.apache.flume.Event;
 import org.apache.flume.EventDeliveryException;
 import org.apache.flume.FlumeException;
-import org.apache.flume.api.RpcTestUtils.OKAvroHandler;
 import org.apache.flume.event.EventBuilder;
-import org.junit.Assert;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.rule.PowerMockRule;
 
+@PrepareForTest({FailoverRpcClient.class, RpcClientFactory.class})
 public class TestFailoverRpcClient {
+
+  @Rule
+  public PowerMockRule powerMock = new PowerMockRule();
+
+  @Rule
+  public ExpectedException thrown = ExpectedException.none();
+
+  FailoverRpcClient c;
+  RpcClientAnswer rpcClientAnswer;
+
+  @Before
+  public void setUp() {
+    PowerMockito.mockStatic(RpcClientFactory.class, withSettings().stubOnly());
+  }
+
+  @After
+  public void tearDown() {
+    if (c != null) {
+      c.close();
+      c = null;
+    }
+    rpcClientAnswer = null;
+  }
+
   /**
    * Test a bunch of servers closing the one we are writing to and bringing
    * another one back online.
@@ -42,94 +78,78 @@ public class TestFailoverRpcClient {
    * @throws EventDeliveryException
    * @throws InterruptedException
    */
-
   @Test
-  public void testFailover()
-      throws FlumeException, EventDeliveryException,InterruptedException {
-    FailoverRpcClient client = null;
-    Server server1 = RpcTestUtils.startServer(new OKAvroHandler());
-    Server server2 = RpcTestUtils.startServer(new OKAvroHandler());
-    Server server3 = RpcTestUtils.startServer(new OKAvroHandler());
+  public void testFailover() throws FlumeException, EventDeliveryException, InterruptedException {
+
     Properties props = new Properties();
-    int s1Port = server1.getPort();
-    int s2Port = server2.getPort();
-    int s3Port = server3.getPort();
     props.put("client.type", "default_failover");
     props.put("hosts", "host1 host2 host3");
-    props.put("hosts.host1", "127.0.0.1:" + String.valueOf(s1Port));
-    props.put("hosts.host2", "127.0.0.1:" + String.valueOf(s2Port));
-    props.put("hosts.host3", "127.0.0.1:" + String.valueOf(s3Port));
-    client = (FailoverRpcClient) RpcClientFactory.getInstance(props);
-    List<Event> events = new ArrayList<Event>();
-    for (int i = 0; i < 50; i++) {
-      events.add(EventBuilder.withBody("evt: " + i, Charset.forName("UTF8")));
-    }
-    client.appendBatch(events);
-    Assert.assertEquals(client.getLastConnectedServerAddress(),
-        new InetSocketAddress("127.0.0.1", server1.getPort()));
-    server1.close();
-    Thread.sleep(1000L); // wait a second for the close to occur
-    events = new ArrayList<Event>();
-    for (int i = 0; i < 50; i++) {
-      events.add(EventBuilder.withBody("evt: " + i, Charset.forName("UTF8")));
-    }
-    client.appendBatch(events);
-    Assert.assertEquals(new InetSocketAddress("localhost", server2.getPort()),
-        client.getLastConnectedServerAddress());
-    server2.close();
-    Thread.sleep(1000L); // wait a second for the close to occur
-    client.append(EventBuilder.withBody("Had a sandwich?",
-        Charset.forName("UTF8")));
-    Assert.assertEquals(new InetSocketAddress("localhost", server3.getPort()),
-        client.getLastConnectedServerAddress());
-    // Bring server 2 back.
-    Server server4 = RpcTestUtils.startServer(new OKAvroHandler(), s2Port);
-    server3.close();
-    Thread.sleep(1000L); // wait a second for the close to occur
-    events = new ArrayList<Event>();
-    for (int i = 0; i < 50; i++) {
-      events.add(EventBuilder.withBody("evt: " + i, Charset.forName("UTF8")));
-    }
-    client.appendBatch(events);
-    Assert.assertEquals(new InetSocketAddress("localhost", s2Port),
-        client.getLastConnectedServerAddress());
+    props.put("hosts.host1", "127.0.0.1:81");
+    props.put("hosts.host2", "127.0.0.1:82");
+    props.put("hosts.host3", "127.0.0.1:83");
 
-    Server server5 = RpcTestUtils.startServer(new OKAvroHandler(), s1Port);
-    // Make sure we are still talking to server 4
+    rpcClientAnswer = new RpcClientAnswer(3, true);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
 
-    client
-    .append(EventBuilder.withBody("Had a mango?", Charset.forName("UTF8")));
-    Assert.assertEquals(new InetSocketAddress("localhost", s2Port),
-        client.getLastConnectedServerAddress());
-    server4.close();
-    Thread.sleep(1000L); // wait a second for the close to occur
-    events = new ArrayList<Event>();
-    for (int i = 0; i < 50; i++) {
-      events.add(EventBuilder.withBody("evt: " + i, Charset.forName("UTF8")));
-    }
-    client.appendBatch(events);
-    Assert.assertEquals(new InetSocketAddress("localhost", s1Port),
-        client.getLastConnectedServerAddress());
-    server5.close();
-    Thread.sleep(1000L); // wait a second for the close to occur
-    Server server6 = RpcTestUtils.startServer(new OKAvroHandler(), s1Port);
-    client
-    .append(EventBuilder.withBody("Had a whole watermelon?",
-        Charset.forName("UTF8")));
-    Assert.assertEquals(new InetSocketAddress("localhost", s1Port),
-        client.getLastConnectedServerAddress());
+    FailoverRpcClient client = new FailoverRpcClient();
+    client.configure(props);
 
-    server6.close();
-    Thread.sleep(1000L); // wait a second for the close to occur
-    Server server7 = RpcTestUtils.startServer(new OKAvroHandler(), s3Port);
-    events = new ArrayList<Event>();
-    for (int i = 0; i < 50; i++) {
-      events.add(EventBuilder.withBody("evt: " + i, Charset.forName("UTF8")));
-    }
-    client.appendBatch(events);
-    Assert.assertEquals(new InetSocketAddress("localhost", s3Port),
-        client.getLastConnectedServerAddress());
-    server7.close();
+    // Active: 0
+    client.appendBatch(getBatchedEvent(1));
+    verify(rpcClientAnswer.getClients().get(0), times(1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), never()).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), never()).appendBatch(anyListOf(Event.class));
+
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(0), false);
+
+    // Active: 0 -> fails -> active: 1
+    client.appendBatch(getBatchedEvent(2));
+    verify(rpcClientAnswer.getClients().get(0), times(1 + 1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), never()).appendBatch(anyListOf(Event.class));
+
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
+
+    // Active: 1 -> fails -> active: 2
+    client.appendBatch(getBatchedEvent(3));
+    verify(rpcClientAnswer.getClients().get(0), times(1 + 1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1 + 1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1)).appendBatch(anyListOf(Event.class));
+
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), true);
+
+    // Active: 2 -> succeeds
+    client.appendBatch(getBatchedEvent(4));
+    verify(rpcClientAnswer.getClients().get(0), times(1 + 1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1 + 1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1 + 1)).appendBatch(anyListOf(Event.class));
+
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(0), true);
+
+    // Active: 2 -> succeeds
+    client.appendBatch(getBatchedEvent(5));
+    verify(rpcClientAnswer.getClients().get(0), times(1 + 1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1 + 1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1 + 1 + 1)).appendBatch(anyListOf(Event.class));
+
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(2), false);
+
+    // Active: 2 -> fails -> active: 0
+    // RPC clients are closed and instantiated again; so we start counting again
+    client.appendBatch(getBatchedEvent(6));
+    verify(rpcClientAnswer.getClients().get(0), times(1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), never()).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), never()).appendBatch(anyListOf(Event.class));
+
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(0), false);
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(2), true);
+
+    // Active: 0 -> fails -> active: 1 -> fails -> active: 2
+    client.appendBatch(getBatchedEvent(7));
+    verify(rpcClientAnswer.getClients().get(0), times(1 + 1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(1), times(1)).appendBatch(anyListOf(Event.class));
+    verify(rpcClientAnswer.getClients().get(2), times(1)).appendBatch(anyListOf(Event.class));
   }
 
   /**
@@ -138,34 +158,43 @@ public class TestFailoverRpcClient {
    * @throws FlumeException
    * @throws EventDeliveryException
    */
-  @Test(
-      expected = EventDeliveryException.class)
-  public void testFailedServers() throws FlumeException, EventDeliveryException {
-    FailoverRpcClient client = null;
-    Server server1 = RpcTestUtils.startServer(new OKAvroHandler());
-    Server server2 = RpcTestUtils.startServer(new OKAvroHandler());
-    Server server3 = RpcTestUtils.startServer(new OKAvroHandler());
+  @Test
+  public void testAllFailedServers() throws FlumeException, EventDeliveryException {
     Properties props = new Properties();
     props.put("client.type", "default_failover");
-
     props.put("hosts", "host1 host2 host3");
-    props.put("hosts.host1", "localhost:" + String.valueOf(server1.getPort()));
-    props.put("hosts.host2", "localhost:" + String.valueOf(server2.getPort()));
-    props.put("hosts.host3", " localhost:" + String.valueOf(server3.getPort()));
-    client = (FailoverRpcClient) RpcClientFactory.getInstance(props);
-    List<Event> events = new ArrayList<Event>();
-    for (int i = 0; i < 50; i++) {
-      events.add(EventBuilder.withBody("evt: " + i, Charset.forName("UTF8")));
-    }
-    client.appendBatch(events);
-    server1.close();
-    server2.close();
-    server3.close();
-    events = new ArrayList<Event>();
-    for (int i = 0; i < 50; i++) {
-      events.add(EventBuilder.withBody("evt: " + i, Charset.forName("UTF8")));
-    }
-    client.appendBatch(events);
+    props.put("hosts.host1", "127.0.0.1:81");
+    props.put("hosts.host2", "127.0.0.1:82");
+    props.put("hosts.host3", "127.0.0.1:83");
+
+    rpcClientAnswer = new RpcClientAnswer(3, true);
+    when(RpcClientFactory.getInstance(any(Properties.class))).then(rpcClientAnswer);
+
+    FailoverRpcClient client = new FailoverRpcClient();
+    client.configure(props);
+
+    client.appendBatch(getBatchedEvent(1));
+    client.appendBatch(getBatchedEvent(2));
+    client.appendBatch(getBatchedEvent(3));
+
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(0), false);
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(1), false);
+    mockRpcClientStatus(rpcClientAnswer.getClients().get(2), false);
+
+    thrown.expect(EventDeliveryException.class);
+    thrown.expectMessage("Failed to send the event!");
+    client.appendBatch(getBatchedEvent(1));
   }
+
+  private List<Event> getBatchedEvent(int index) {
+    List<Event> result = new ArrayList<Event>();
+    result.add(getEvent(index));
+    return result;
+  }
+
+  private Event getEvent(int index) {
+    return EventBuilder.withBody(("event: " + index).getBytes());
+  }
+
 
 }

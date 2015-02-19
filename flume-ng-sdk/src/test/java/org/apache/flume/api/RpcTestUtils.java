@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 
-import junit.framework.Assert;
 import org.apache.avro.AvroRemoteException;
 import org.apache.avro.ipc.NettyServer;
 import org.apache.avro.ipc.Responder;
@@ -46,6 +45,8 @@ import org.jboss.netty.handler.codec.compression.ZlibDecoder;
 import org.jboss.netty.handler.codec.compression.ZlibEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import junit.framework.Assert;
 
 /**
  * Helpers for Netty Avro RPC testing

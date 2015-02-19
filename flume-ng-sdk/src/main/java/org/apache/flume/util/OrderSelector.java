@@ -150,8 +150,8 @@ public abstract class OrderSelector<T> {
   }
 
   private static class FailureState {
-    long lastFail = 0;
-    long restoreTime = 0;
+    long lastFail = Long.MIN_VALUE;
+    long restoreTime = Long.MIN_VALUE;
     int sequentialFails = 0;
   }
 }

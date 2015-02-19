@@ -18,8 +18,6 @@
  */
 package org.apache.flume.api;
 
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
@@ -232,18 +230,6 @@ public class FailoverRpcClient extends AbstractRpcClient implements RpcClient {
       client.close();
       isActive = false;
     }
-  }
-
-  /**
-   * Get the last socket address this client connected to. No guarantee this
-   * will be the next it will connect to. If this host is down, it will connect
-   * to another host. To be used only from the unit tests!
-   * @return The last socket address this client connected to
-   */
-  protected InetSocketAddress getLastConnectedServerAddress() {
-    HostInfo hostInfo = hosts.get(lastCheckedhost);
-    return new InetSocketAddress(hostInfo.getHostName(),
-        hostInfo.getPortNumber());
   }
 
   private RpcClient getNextClient() throws FlumeException {

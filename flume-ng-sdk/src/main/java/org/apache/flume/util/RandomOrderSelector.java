@@ -37,15 +37,18 @@ public class RandomOrderSelector<T> extends OrderSelector<T> {
   public synchronized Iterator<T> createIterator() {
     List<Integer> indexList = getIndexList();
 
-    int size = indexList.size();
-    int[] indexOrder = new int[size];
-
-    while (indexList.size() != 1) {
-      int pick = random.nextInt(indexList.size());
-      indexOrder[indexList.size() - 1] = indexList.remove(pick);
+    if (indexList.isEmpty()) {
+      return new SpecificOrderIterator<T>(new int[0], getObjects());
     }
 
-    indexOrder[0] = indexList.get(0);
+    int size = indexList.size();
+    int[] indexOrder = new int[size];
+    int idx = 0;
+
+    while (!indexList.isEmpty()) {
+      int pick = random.nextInt(indexList.size());
+      indexOrder[idx++] = indexList.remove(pick);
+    }
 
     return new SpecificOrderIterator<T>(indexOrder, getObjects());
   }

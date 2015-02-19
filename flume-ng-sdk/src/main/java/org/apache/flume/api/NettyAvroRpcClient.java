@@ -243,10 +243,6 @@ implements RpcClient {
       if (t instanceof Error) {
         throw (Error) t;
       }
-      if (t instanceof TimeoutException) {
-        throw new EventDeliveryException(this + ": Failed to send event. " +
-            "RPC request timed out after " + requestTimeout + "ms", t);
-      }
       throw new EventDeliveryException(this + ": Failed to send event", t);
     }
   }

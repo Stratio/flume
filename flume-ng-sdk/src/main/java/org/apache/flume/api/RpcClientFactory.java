@@ -52,6 +52,9 @@ public class RpcClientFactory {
   @SuppressWarnings("unchecked")
   public static RpcClient getInstance(Properties properties)
       throws FlumeException {
+    if (properties == null) {
+      throw new NullPointerException("properties must not be null");
+    }
     String type = null;
     type = properties.getProperty(
         RpcClientConfigurationConstants.CONFIG_CLIENT_TYPE);
@@ -101,6 +104,9 @@ public class RpcClientFactory {
    */
   public static RpcClient getInstance(File propertiesFile)
       throws FileNotFoundException, IOException {
+    if (propertiesFile == null) {
+      throw new NullPointerException("propertiesFile must not be null");
+    }
     Reader reader = new FileReader(propertiesFile);
     Properties props = new Properties();
     props.load(reader);
