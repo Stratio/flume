@@ -82,7 +82,7 @@ limitations under the License.
     <log4j.version>1.2.17</log4j.version>
     <mapdb.version>0.9.9</mapdb.version>
     <mina.version>2.0.4</mina.version>
-    <netty.version>3.5.12.Final</netty.version>
+    <netty.version>3.10.1.Final</netty.version>
     <protobuf.version>2.5.0</protobuf.version>
     <servlet.api.version>2.5-20110124</servlet.api.version>
     <slf4j.version>1.7.7</slf4j.version>
